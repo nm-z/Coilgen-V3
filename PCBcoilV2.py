@@ -43,6 +43,9 @@ TODO list:
 import numpy as np
 from typing import Callable # just for type-hints to provide some nice syntax colering
 import time # used for time.sleep()
+import importlib
+import queue
+
 
 visualization = True # if you don't have pygame, you can still use the math
 saveToFile = True # if visualization == False! (if True, then just use 's' key)
@@ -263,9 +266,11 @@ def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWi
         return((coeff[0] * magneticConstant * (turns**2) * averageDiamM * (np.log(coeff[1]/fillFactor) + (coeff[2]*fillFactor) + (coeff[3]*(fillFactor**2)))) / 2)
     else: print("impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!");  return(-1.0) # should never happen due to earlier check
 
+
+"""
 ################ original formula
 # def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
-#     """ returns inducance (in Henry) of PCB coil (multi-layer) """
+#     returns inducance (in Henry) of PCB coil (multi-layer) 
 #     singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula) # calculate the inductance of a single layer the same way
 #     if(singleInduct < 0):  print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct);  return(-1.0) # should never happen
     
@@ -288,7 +293,7 @@ def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWi
 
 ################ unfinished rework using a 4th paper
 # def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
-#     """ returns inducance (in Henry) of PCB coil (multi-layer) """
+#     returns inducance (in Henry) of PCB coil (multi-layer)
 #     singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula) # calculate the inductance of a single layer the same way
 #     if(singleInduct < 0):  print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct);  return(-1.0) # should never happen
     
@@ -314,6 +319,7 @@ def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWi
 #         totalMutualInduct *= ((4/np.pi)**v)
 #     ## mutual inductance to total inductance math here!
 #     return(totalInduct)
+"""
 
 ################ my formula (Note: based on somewhat limited sample size (see documentation))
 def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
@@ -375,6 +381,12 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     filename += '_Re'+str(int(round(coil.calcTotalResistance() * 1000, 0))) # Resistance (milliOhms) (assuming nothing changes!)
     filename += '_In'+str(int(round(coil.calcInductance() * 1000000000, 0)))  # Inductance (nanoHenry) (assuming nothing changes!)
     return(filename)
+
+
+
+
+
+
 
 class coilClass:
     """ a class to hold the parameter set and rendered output of a coil """
@@ -441,12 +453,7 @@ class coilClass:
         import cv2exporter as cv2exp
         cv2exp.imwrite(self, *arg)
 
-
-if __name__ == "__main__": # normal usage
-    try:
-
-        # coil = coilClass(turns=9, diam=40, clearance=0.30, traceWidth=1.0, layers=1,                   copperThickness=0.030, shape=shapes['hexagon'], formula='cur_sheet') # single layer on PA
-        coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=0.9, layers=2, PCBthickness=0.6, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 2 layer PCB
+        # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=0.9, layers=2, PCBthickness=0.6, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 2 layer PCB
         # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=0.9, layers=4, PCBthickness=0.8, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 4 layer PCB
         # coil = coilClass(turns=8, diam=24, clearance=0.10, traceWidth=1.0, layers=6, PCBthickness=1.2, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 6 layer PCB
         # coil = coilClass(turns=9, diam=35, clearance=0.15, traceWidth=1.15, layers=2, PCBthickness=0.13, copperThickness=0.045, shape=shapes['circle'], formula='cur_sheet') # WLP final one 35mm (0.13mm PA) (NOT USED)
@@ -457,11 +464,169 @@ if __name__ == "__main__": # normal usage
         # coil = coilClass(turns=4, diam=35, clearance=1.25, traceWidth=0.25, layers=2, PCBthickness=0.05, copperThickness=0.0020, shape=shapes['square'], formula='cur_sheet') # new design 2L (slightly thick!)
         # coil = coilClass(turns=3, diam=35, clearance=0.75, traceWidth=0.25, layers=2, PCBthickness=0.05, copperThickness=0.0015, shape=shapes['square'], formula='cur_sheet') # new design 2L alt
         # coil = coilClass(turns=8, diam=24, clearance=0.10, traceWidth=1.0, layers=6, PCBthickness=1.2, copperThickness=0.015, shape=shapes['circle'], formula='cur_sheet') # 6L test sample (uneven spacing!)
-        
         # coil = coilClass(turns=1, diam=40, clearance=0.30, traceWidth=1.0, layers=1,                   copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # render test
 
-        renderedLineLists: list[list[tuple[int,int]]] = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
+
+
+
+
+
+
+###### TKINTER ######
+
+
+# Tkinter needs multiprocessing to work properly
+
+from multiprocessing import Process
+import time
+
+def run_tkinter(shared_data, task_queue):
+    print("Running Tkinter...")
+    import tkinter as tk
+    import importlib
+    module_name = 'tkinter_coil_gui'
+    module = importlib.import_module(module_name)
+    CoilUpdater = module.CoilUpdater
+    root = tk.Tk()   # Tkinter GUI Addition
+    app = CoilUpdater(master=root, shared_data=shared_data)
+    while True:
+        try:
+            # Execute any functions put in the queue
+            task = task_queue.get_nowait()
+            root.after_idle(task)
+        except queue.Empty:
+            pass
+        root.update_idletasks()
+        root.update()
+
+def run_pygame(shared_data, task_queue, windowHandler=None):
+    print("Running Pygame...")
+    import pygameRenderer as PR # rendering code
+    import pygameUI as UI # UI handling code
+    print("Imported Pygame modules...")
+    if windowHandler is None:
+        windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
+    drawer = PR.pygameDrawer(windowHandler)
+    print("Initialized Pygame window...")
+    print("Initialized Pygame window...")
+    drawer.localVar = shared_data['coil'] # not my best code...
+    drawer.localVarUpdated = False # a flag for the UI to trigger a re-calculation
+    drawer.debugText = drawer.makeDebugText(shared_data['coil'])
+    drawer.lastFilename = shared_data['coil'].generateCoilFilename()
+    while True:
+        try:
+            # Execute any functions put in the queue
+            task = task_queue.get_nowait()
+            drawer.renderBG() # draw background
+            drawer.drawLineList(renderedLineLists)
+            drawer.renderFG() # draw foreground (text and stuff)
+            windowHandler.frameRefresh()
+            UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
+            if(drawer.localVarUpdated):
+                drawer.localVarUpdated = False
+                print("Pygame window updated...")
+        except queue.Empty:
+            pass
+        except Exception as e:
+            print(f"Error in Pygame loop: {e}")
+            shared_data['coil'] = drawer.localVar
+            renderedLineLists = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
+            drawer.debugText = drawer.makeDebugText(shared_data['coil'])
+            drawer.lastFilename = shared_data['coil'].generateCoilFilename()
+
+
+
+
+
+
+
+
+
+
+###### Main Loop #######
+if __name__ == "__main__": # normal usage
+    try:
+        coil = coilClass(turns=9, diam=40, clearance=0.30, traceWidth=1.0, layers=1, copperThickness=0.030, shape=shapes['hexagon'], formula='cur_sheet') # single layer on PA
+
+######Tkinter GUI Addition#####
+        import tkinter as tk
+        import threading
+        import importlib
+        import pygameRenderer as PR # rendering code
+        import pygameUI as UI # UI handling code
+        import sys
+
+        module_name = 'tkinter_coil_gui'
         
+        module = importlib.import_module(module_name)
+        
+        CoilUpdater = module.CoilUpdater
+        
+        root = tk.Tk()   # Tkinter GUI Addition
+
+        # Define shared_data and assign the coil object to it
+        shared_data = {'coil': coil}
+        renderedLineLists: list[list[tuple[int,int]]] = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
+
+        # Create a queue
+        task_queue = queue.Queue()
+
+        # Pass the shared_data dictionary to CoilUpdater
+        app = CoilUpdater(master=root, shared_data=shared_data)
+
+        # Initialize windowHandler and drawer
+        try:
+            windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
+        except Exception as e:
+            print(f"Error initializing Pygame window: {e}")
+            sys.exit(1)
+
+        drawer = PR.pygameDrawer(windowHandler)
+
+        # Initialize loopStart
+        loopStart = time.time()
+
+        p1 = Process(target=run_tkinter, args=(shared_data, task_queue)) # Multiprocessing for Tkinter
+        p2 = Process(target=run_pygame, args=(shared_data, task_queue)) # Multiprocessing for Pygame
+
+        p1.start() # Start Tkinter
+        p2.start() # Start Pygame
+
+
+        # visualization loop:
+        while(windowHandler.keepRunning):
+            try:
+                # Execute any functions put in the queue
+                task = task_queue.get_nowait()
+                drawer.renderBG() # draw background
+
+                drawer.drawLineList(renderedLineLists)
+
+                drawer.renderFG() # draw foreground (text and stuff)
+                # drawer.redraw() # render all elements
+                windowHandler.frameRefresh()
+                UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
+                if(drawer.localVarUpdated):
+                    drawer.localVarUpdated = False
+                    shared_data['coil'] = drawer.localVar
+                    renderedLineLists = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
+                    drawer.debugText = drawer.makeDebugText(shared_data['coil'])
+                    drawer.lastFilename = shared_data['coil'].generateCoilFilename()
+
+                loopEnd = time.time() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
+                targetFPS = 60
+                if((loopEnd-loopStart) < (1/(targetFPS*1.05))): #60FPS limiter (optional)
+                    time.sleep((1/targetFPS)-(loopEnd-loopStart))
+            except queue.Empty:
+                pass        
+
+            p1.join() # Wait for Tkinter to finish
+            p2.join() # Wait for Pygame to finish
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+######### End of TKINTER #########
         if(visualization):
             import pygameRenderer as PR # rendering code
             import pygameUI as UI # UI handling code
