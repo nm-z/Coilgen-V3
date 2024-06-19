@@ -267,60 +267,6 @@ def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWi
     else: print("impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!");  return(-1.0) # should never happen due to earlier check
 
 
-"""
-################ original formula
-# def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
-#     returns inducance (in Henry) of PCB coil (multi-layer) 
-#     singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula) # calculate the inductance of a single layer the same way
-#     if(singleInduct < 0):  print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct);  return(-1.0) # should never happen
-    
-#     ## See V1 for some notes on how the I combined paper[2] and [3]
-#     ## NOTE: this formula can be greatly improved by REMOVING turnsCoef, and replacing it with a constant value (scaling generalCoef). This is still worse at very small layerSpacing, because spaceCoef should've been linear
-#     ## TODO: (even though this stuff is depricated), add layer stack manager stuff to this one as well
-#     spaceCoef: tuple[float] = (0.184, -0.525, 1.038, 1.001) # values in paper[2] = (0.184, -0.525, 1.038, 1.001)
-#     couplFactDeconstrSpaceComp: Callable[[float], float] = lambda layerSpacingMM : (spaceCoef[0]*(layerSpacingMM**3) + spaceCoef[1]*(layerSpacingMM**2) + spaceCoef[2]*layerSpacingMM + spaceCoef[3])
-#     turnsCoef: tuple[float] = (1.67, -5.84, 65) # values in paper[2] = (1.67, -5.84, 65)
-#     couplFactDeconstrTurnsComp: Callable[[float], float] = lambda turns : ((turns**2) / (turnsCoef[0]*(turns**2) + turnsCoef[1]*turns + turnsCoef[2]))
-#     generalCoef: float = 1.0 / 0.64 # values in paper[2] = 1.0 / 0.64
-
-#     ## the formula for inductance (from paper[3]) (assuming i'm interpreting it correctly):
-#     layerDependentCouplingComp = 0.0 # note: this is alsmost mutual inductance, it just needs to be multiplied with singleInduct (which is done at the end)
-#     for i in range(1, layers):
-#         layerDependentCouplingComp += (layers-i) / couplFactDeconstrSpaceComp(i * layerSpacing)
-#     totalInduct = singleInduct * (layers + (2 * layerDependentCouplingComp * couplFactDeconstrTurnsComp(turns) * generalCoef) )
-#     return(totalInduct)
-
-
-################ unfinished rework using a 4th paper
-# def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
-#     returns inducance (in Henry) of PCB coil (multi-layer)
-#     singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula) # calculate the inductance of a single layer the same way
-#     if(singleInduct < 0):  print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct);  return(-1.0) # should never happen
-    
-#     ## This is a trial for a new paper i found, paper[4]
-#     ## it has its own magic formula for mutual inductance between the transmitter and receiver coil
-#     ## i'm attempting to apply it to multi-layer coils
-#     ## if im reading it correctly, it attempts to model each line of a rectangular coil individually, adding the mutual couplings of all of them at the end.
-#     ## a_i and b_J seem like they're calculating either a line segment length or maybe an inner diameter
-#     # radiusOther = ((diam/2)*distUnitMult);  turnsOther = turns;  traceWidthOther = (traceWidth*distUnitMult);  clearanceOther = (clearance*distUnitMult) # the second coil in question is the same as the first coil
-#     for i_layer in range(1, layers):
-#         totalMutualInduct = 0.0
-#         for i in range(turns):
-#             for j in range(turns): # turnsOther
-#                 a_i = ((diam/2)*distUnitMult) - (turns - 1)*((traceWidth*distUnitMult) + (clearance*distUnitMult)) - ((traceWidth*distUnitMult)/2)
-#                 # b_j = radiusOther - (turnsOther - 1)*(traceWidthOther + clearanceOther) - (traceWidthOther/2)
-#                 b_j = a_i # the coils are the same on each layer
-#                 d_r = i_layer * layerSpacing * distUnitMult # relative distance between coils
-#                 Y_ij = (2*a_i*b_j)/((a_i**2)+(b_j**2)+(d_r**2))
-#                 K = (15/32, 315/1024) # tuple of magic numbers
-#                 M_ij = ((magneticConstant*np.pi*(a_i**2)*(b_j**2)) / (2*(((a_i**2)+(b_j**2)+(d_r**2))**(3/2)))) * (1 + K[0]*(Y_ij**2) + K[1]*(Y_ij**4))
-#                 totalMutualInduct += M_ij
-#         v = 1+(r_i2/r_i1)
-#         totalMutualInduct *= ((4/np.pi)**v)
-#     ## mutual inductance to total inductance math here!
-#     return(totalInduct)
-"""
-
 ################ my formula (Note: based on somewhat limited sample size (see documentation))
 def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
     """ returns inducance (in Henry) of PCB coil (multi-layer) """
@@ -381,10 +327,6 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     filename += '_Re'+str(int(round(coil.calcTotalResistance() * 1000, 0))) # Resistance (milliOhms) (assuming nothing changes!)
     filename += '_In'+str(int(round(coil.calcInductance() * 1000000000, 0)))  # Inductance (nanoHenry) (assuming nothing changes!)
     return(filename)
-
-
-
-
 
 
 
@@ -469,16 +411,13 @@ class coilClass:
 
 
 
-
-
-
 ###### TKINTER ######
-
 
 # Tkinter needs multiprocessing to work properly
 
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 import time
+import queue
 
 def run_tkinter(shared_data, task_queue):
     print("Running Tkinter...")
@@ -508,7 +447,6 @@ def run_pygame(shared_data, task_queue, windowHandler=None):
         windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
     drawer = PR.pygameDrawer(windowHandler)
     print("Initialized Pygame window...")
-    print("Initialized Pygame window...")
     drawer.localVar = shared_data['coil'] # not my best code...
     drawer.localVarUpdated = False # a flag for the UI to trigger a re-calculation
     drawer.debugText = drawer.makeDebugText(shared_data['coil'])
@@ -534,22 +472,12 @@ def run_pygame(shared_data, task_queue, windowHandler=None):
             drawer.debugText = drawer.makeDebugText(shared_data['coil'])
             drawer.lastFilename = shared_data['coil'].generateCoilFilename()
 
-
-
-
-
-
-
-
-
-
 ###### Main Loop #######
 if __name__ == "__main__": # normal usage
     try:
         coil = coilClass(turns=9, diam=40, clearance=0.30, traceWidth=1.0, layers=1, copperThickness=0.030, shape=shapes['hexagon'], formula='cur_sheet') # single layer on PA
-
+        
 ######Tkinter GUI Addition#####
-        import tkinter as tk
         import threading
         import importlib
         import pygameRenderer as PR # rendering code
@@ -561,8 +489,6 @@ if __name__ == "__main__": # normal usage
         module = importlib.import_module(module_name)
         
         CoilUpdater = module.CoilUpdater
-        
-        root = tk.Tk()   # Tkinter GUI Addition
 
         # Define shared_data and assign the coil object to it
         shared_data = {'coil': coil}
@@ -571,10 +497,9 @@ if __name__ == "__main__": # normal usage
         # Create a queue
         task_queue = queue.Queue()
 
-        # Pass the shared_data dictionary to CoilUpdater
-        app = CoilUpdater(master=root, shared_data=shared_data)
-
         # Initialize windowHandler and drawer
+        import pygameRenderer as PR # rendering code
+        import pygameUI as UI # UI handling code
         try:
             windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
         except Exception as e:
@@ -587,14 +512,13 @@ if __name__ == "__main__": # normal usage
         loopStart = time.time()
 
         p1 = Process(target=run_tkinter, args=(shared_data, task_queue)) # Multiprocessing for Tkinter
-        p2 = Process(target=run_pygame, args=(shared_data, task_queue)) # Multiprocessing for Pygame
+        p2 = Process(target=run_pygame, args=(shared_data, task_queue, windowHandler)) # Multiprocessing for Pygame
 
         p1.start() # Start Tkinter
         p2.start() # Start Pygame
 
-
         # visualization loop:
-        while(windowHandler.keepRunning):
+        while windowHandler.keepRunning:
             try:
                 # Execute any functions put in the queue
                 task = task_queue.get_nowait()
@@ -603,7 +527,6 @@ if __name__ == "__main__": # normal usage
                 drawer.drawLineList(renderedLineLists)
 
                 drawer.renderFG() # draw foreground (text and stuff)
-                # drawer.redraw() # render all elements
                 windowHandler.frameRefresh()
                 UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
                 if(drawer.localVarUpdated):
@@ -620,8 +543,8 @@ if __name__ == "__main__": # normal usage
             except queue.Empty:
                 pass        
 
-            p1.join() # Wait for Tkinter to finish
-            p2.join() # Wait for Pygame to finish
+        p1.join() # Wait for Tkinter to finish
+        p2.join() # Wait for Pygame to finish
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -684,3 +607,5 @@ if __name__ == "__main__": # normal usage
                 print("stopped pygame window")
             except:
                 print("couldn't run windowHandler.end()")
+
+
