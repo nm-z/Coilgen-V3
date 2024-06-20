@@ -1,0 +1,7 @@
+numpy==1.23.4
+pygame==3.10.8
+dxfwrite==1.2.2
+pandas==1.5.2
+openpyxl==3.0.10
+opencv-python==4.6.0.66
+matplotlib==3.6.2

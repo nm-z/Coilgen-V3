@@ -46,3 +46,9 @@ links to papers:
 
 - (probably better alternative solution) https://www.mdpi.com/1424-8220/21/14/4864
 - (helps justify inaccuracy of results)  https://www.mdpi.com/1424-8220/22/10/3815
+
+
+
+activate virtual environment: 
+
+source /home/nate/Desktop/PCBcoilGenerator/coilgen/bin/activate

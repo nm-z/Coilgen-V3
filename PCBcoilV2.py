@@ -1,611 +1,310 @@
-"""
-this code is intended for generating (and visualizing) PCB coils (a.k.a. planar inductors), with 1 or more layers
-this code can (currently) only produce coils with an equal width and height (one diameter parameter, no ovals)
-V2 differs from V1 in that I've now started to adjust the math based on some test samples i've made.
-In V1, the constants in the formulas all perfectly match those in the papers that they originate from,
- now however, the constants for calculating the coupling factor in multi-layer coils will be different!
-NOTE: the math for single-layer coils remains the same, as that appeared to be quite accurate (in the 4~5 samples i measured)
-For details on these test samples i analyzed, please refer to the documentation/notes i wrote: (should be a PDF next to this code somewhere)
-
-I am not the first to try this, and others have already done this BETTER: 
-- (probably better alternative solution) https://www.mdpi.com/1424-8220/21/14/4864      <-- models every single line segment using Maxwell equations (like a nerd). Probably more accurate than this though
-
-in the making of this code, i used these papers:
-paper[1] @ https://stanford.edu/~boyd/papers/pdf/inductance_expressions.pdf     which is applied for demo purposes @ https://coil32.net/pcb-coil.html
-paper[2] @ http://www.edatop.com/down/paper/NFC/A_new_calculation_for_designing_multilayer_planar_spiral_inductors_PDF.pdf
-paper[3] @ https://www.researchgate.net/publication/271291453_Design_and_Optimization_of_Printed_Circuit_Board_Inductors_for_Wireless_Power_Transfer_System
-UNUSED (for now): paper[4] @ https://inpressco.com/wp-content/uploads/2017/10/Paper26.1835-1841.pdf
-
-the single-layer math comes from paper[1]
-the multilayer coil calculations originally came from paper[2] and paper[3], but now come from a formula based on my own samples
-(paper[4] may provide an altermate calculation for mutual inductance, but that code is currently unfinished)
-
-the current sheet formula from paper[1] is also mentioned in paper[2] and paper[3], which gives some confidence to prefer that method
-the coefficients tables are exactly the same, as they all draw from another paper, under the name 'Greenhouse'
-
-The way a PCB coil object may be stored/exported is as a collection of straight lines, as a rendered polygon, or as a formula.
-In Altium there does not appear to be a way of importing a polygon, so it'll have to be a list of lines, i guess
-In EasyEDA you can make polygons, but you'd have to manually fill in a lot of values, so a series of line would also be fewer steps.
-
-TODO list:
- - better editing of coefficients (text boxes???)
- - layer stack editor (seperate screen???)
- - add a more direct exporting method (footprint files or scripts): https://www.google.com/search?q=easyEDA+scripting
- - improve pygame rendering (pygame struggles to draw thick lines like i want and the circle aren't helping much)
- - add an auto-optimizer (given a few limits (diameter, clearance, layers, layerSpacing) and targets (inductance, resistance, layers?), find the optimim coil design (minimizing for number of layers, resistance, etc.))
- - find a way to model rectangular/oval coils (non-square)
- - add visual for (approximation of) the size of the magnetic field the coil exudes???
- - (i think doing this for coils with different inductances on different layers might not be impossible. M = K*sqrt(L_1*L_2) => K*L if L_1==L_2, but since i estimate K, why couldn't the coils be different?...)
-        (extra note: different coil specs on diffent layers could prove especially useful, as coupling is nonlinear, while resistance is linear (more layers -> more efficient), BUT inner layers means thin copper)
-"""
-
-
+from tkinter_coil_gui import CoilParameterGUI
+import tkinter as tk
 import numpy as np
-from typing import Callable # just for type-hints to provide some nice syntax colering
-import time # used for time.sleep()
-import importlib
-import queue
+import time
+from typing import Callable
 
+visualization = True  # if you don't have pygame, you can still use the math
+saveToFile = True  # if visualization == False! (if True, then just use 's' key)
 
-visualization = True # if you don't have pygame, you can still use the math
-saveToFile = True # if visualization == False! (if True, then just use 's' key)
-
-angleRenderResDefault = np.deg2rad(5) # angular resolution when rendering continous (circular) coils
+angleRenderResDefault = np.deg2rad(5)  # angular resolution when rendering continuous (circular) coils
 rotateNthDimSpirals = True
 
-## scientific constants:
-magneticConstant = 4*np.pi * 10**-7 # Mu_0 = Newtons / Ampere    ('vacuum permeability'???, 'relative permeability of space'???)
-ozCopperToMeters: Callable[[float],float] = lambda ozCopper : (34.8 * ozCopper  * 10**-6) # NOTE: there is some tolerance on the definition of an oz (in manufacturing), it may be closer to 30um in reality
-ozCopperToMM: Callable[[float],float] = lambda ozCopper : (34.8 * ozCopper  * 10**-3) # NOTE: there is some tolerance on the definition of an oz (in manufacturing), it may be closer to 30um in reality
-mmCopperToOz: Callable[[float],float] = lambda mmCopper : ((mmCopper * 10**-3) / 34.8) # the copperThickness is stored as millimeters
-umCopperToOz: Callable[[float],float] = lambda umCopper : (umCopper / 34.8) # just in case you know the exact height in micrometers
-RhoCopper = 1.72 * 10**-8 # Ohms * meter
-## code constants
-distUnitMult = 1/1000 # all distance units are in mm, so to convert back to meters, multiply with this
+# Scientific constants
+magneticConstant = 4 * np.pi * 10**-7  # Mu_0 = Newtons / Ampere
+ozCopperToMeters = lambda ozCopper: (34.8 * ozCopper * 10**-6)  # convert oz of copper to meters
+ozCopperToMM = lambda ozCopper: (34.8 * ozCopper * 10**-3)  # convert oz of copper to mm
+mmCopperToOz = lambda mmCopper: ((mmCopper * 10**-3) / 34.8)  # convert mm of copper to oz
+umCopperToOz = lambda umCopper: (umCopper / 34.8)  # convert um of copper to oz
+RhoCopper = 1.72 * 10**-8  # Ohms * meter
+
+# Code constants
+distUnitMult = 1/1000  # convert mm to meters
 
 class _shapeBaseClass:
-    """ (static class) base class for defining a shape (and it's associated math) """
     formulaCoefficients: dict[str, tuple[float]]
-    stepsPerTurn: int | float # discrete shapes use an int (number of corners), continuous shapes (circularSpiral) uses a float (angle in radians)
+    stepsPerTurn: int | float
+    isDiscrete: bool = True
+
     @staticmethod
-    def calcPos(itt:int|float,diam:float,clearance:float,traceWidth:float,CCW:bool)->tuple[float, float]:  ... # the modern python way of type-hinting an undefined function
+    def calcPos(itt: int | float, diam: float, clearance: float, traceWidth: float, CCW: bool) -> tuple[float, float]: ...
     @staticmethod
-    def calcLength(itt:int|float,diam:float,clearance:float,traceWidth:float)->float:  ...
-    isDiscrete: bool = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
-    def __repr__(self): # prints the name of the shape
-        return("shape("+(self.__class__.__name__)+")")
+    def calcLength(itt: int | float, diam: float, clearance: float, traceWidth: float) -> float: ...
+
+    def __repr__(self):
+        return "shape(" + self.__class__.__name__ + ")"
 
 class squareSpiral(_shapeBaseClass):
-    """ (static class) class to hold parameters and functions for square shaped coils """
-    formulaCoefficients = {'wheeler' : (2.34, 2.75),
-                            'monomial' : (1.62, -1.21, -0.147, 2.40, 1.78, -0.030),
-                            'cur_sheet' : (1.27, 2.07, 0.18, 0.13)}
-    stepsPerTurn: int = 4 # multiply with number of turns to get 'itt' for functions below
+    formulaCoefficients = {
+        'wheeler': (2.34, 2.75),
+        'monomial': (1.62, -1.21, -0.147, 2.40, 1.78, -0.030),
+        'cur_sheet': (1.27, 2.07, 0.18, 0.13)
+    }
+    stepsPerTurn: int = 4
+
     @staticmethod
     def calcPos(itt: int, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
-        """ input is the number of steps (corners), 4 steps would be a full circle, generally: itt=(stepsPerTurn*turns)
-            output is a 2D coordinate along the spiral, starting outwards """
         spacing = calcTraceSpacing(clearance, traceWidth)
-        x =      (1 if (((itt%4)>=2) ^ CCW) else -1)      * (((diam-traceWidth)/2) - ((itt//4)     * spacing))
-        y = (1 if (((itt%4)==1) or ((itt%4)==2)) else -1) * (((diam-traceWidth)/2) - (((itt-1)//4) * spacing))
-        return(x,y)
+        x = (1 if (((itt % 4) >= 2) ^ CCW) else -1) * (((diam - traceWidth) / 2) - ((itt // 4) * spacing))
+        y = (1 if (((itt % 4) == 1) or ((itt % 4) == 2)) else -1) * (((diam - traceWidth) / 2) - (((itt - 1) // 4) * spacing))
+        return (x, y)
+
     @staticmethod
     def calcLength(itt: int, diam: float, clearance: float, traceWidth: float) -> float:
-        """ returns the length of the spiral at a given itt (without iterating, direct calculation) """
-        ## NOTE: if the spiral goes beyond the center point and grows larger again (it shouldn't), then the length will be negative). I'm intentionally not fixing that, becuase it makes for good debug info
         spacing = calcTraceSpacing(clearance, traceWidth)
-        horLines = (itt//2)
-        sumOfWidths = (horLines * (diam-traceWidth)) - ((((horLines-1)*horLines) / 2) * spacing) # length of all hor. lines = (horLines * diam) - triangular number of (horLines-1)
-        vertLines = ((itt+1)//2)
-        sumOfHeights = (vertLines * (diam-traceWidth)) - ((max(((vertLines-2)*(vertLines-1)) / 2, 0) - 1) * spacing) # length of all vert. lines
-        return(sumOfWidths + sumOfHeights)
-        ## paper[3] mentioned the formula: 4*turns*diam - 4*turns*tracewidth - (2*turns+1)^2 * (spacing)   but, please review their definitions of outer diameter and spacing before using this!
+        horLines = (itt // 2)
+        sumOfWidths = (horLines * (diam - traceWidth)) - ((((horLines - 1) * horLines) / 2) * spacing)
+        vertLines = ((itt + 1) // 2)
+        sumOfHeights = (vertLines * (diam - traceWidth)) - ((max(((vertLines - 2) * (vertLines - 1)) / 2, 0) - 1) * spacing)
+        return (sumOfWidths + sumOfHeights)
 
 class circularSpiral(_shapeBaseClass):
-    """ (static class) class to hold parameters and functions for circularly shaped coils """
-    formulaCoefficients = {'wheeler' : (2.23, 3.45),
-                            # the monomial formula does cover circular spirals
-                            'cur_sheet' : (1.00, 2.46, 0.00, 0.20)}
-    stepsPerTurn: float = 2*np.pi # multiply with number of turns to get 'angle' for functions below
-    isDiscrete = False # let the renderer know that this shape needs a resolution parameter
+    formulaCoefficients = {'wheeler': (2.23, 3.45), 'cur_sheet': (1.00, 2.46, 0.00, 0.20)}
+    stepsPerTurn: float = 2 * np.pi
+    isDiscrete = False
+
     @staticmethod
     def calcPos(angle: float, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
-        """ input is an angle in radians, 2pi would be a full circle, generally: angle=(stepsPerTurn*turns)
-            output is a 2D coordinate along the spiral, starting outwards """
         spacing = calcTraceSpacing(clearance, traceWidth)
-        phaseShift = 0.0 # note: i have already phase-shifted (and inverted) the conventional cirlce by 90deg by using sin() for x and cos() for y (normally you would do it the other way around)
-        x = (1 if CCW else -1) * np.sin(angle) * (((diam-traceWidth)/2) - ((angle/(2*np.pi)) * spacing))
-        y =         -1         * np.cos(angle) * (((diam-traceWidth)/2) - ((angle/(2*np.pi)) * spacing))
-        return(x,y)
+        x = (1 if CCW else -1) * np.sin(angle) * (((diam - traceWidth) / 2) - ((angle / (2 * np.pi)) * spacing))
+        y = -1 * np.cos(angle) * (((diam - traceWidth) / 2) - ((angle / (2 * np.pi)) * spacing))
+        return (x, y)
+
     @staticmethod
     def calcLength(angle: float, diam: float, clearance: float, traceWidth: float) -> float:
-        """ returns the length of the spiral at a given angle (without iterating, direct calculation) """
-        turns = (angle/circularSpiral.stepsPerTurn) # (float)
-        return(np.pi * turns * (diam + calcSimpleInnerDiam(turns, diam, clearance, traceWidth, circularSpiral())) / 2) # pi * turns * (diam + innerDiam) / 2 = basically just the circumference of the average diameter (outer+inner)/2
+        turns = (angle / circularSpiral.stepsPerTurn)
+        return (np.pi * turns * (diam + calcSimpleInnerDiam(turns, diam, clearance, traceWidth, circularSpiral())) / 2)
 
-## now that the circularSpiral class exists, we can just derive sampled classes from that:
-class NthDimSpiral(_shapeBaseClass): # a general class for Nth dimensional polygon spirals. Specify the number of points/corners/sides (6 for hexagon, 8 for octagon, etc.) and provide formulaCoefficients in the subclass
-    """ (static class) a base class for Nth dimensional polygon spirals.
-        Specify the number of points/corners/sides as .stepsPerTurn (6 for hexagon, 8 for octagon, etc.) and provide .formulaCoefficients in the subclass """
+class NthDimSpiral(_shapeBaseClass):
     @classmethod
-    def circumDiam(subclass, inscribedDiam: float) -> float:  return(inscribedDiam / np.cos(np.deg2rad(180/subclass.stepsPerTurn))) # just a macro for calculating the diameter of a circumscribed circle (spiral diam is inscribed)
-    @classmethod # class methods let you use subclass static variables
+    def circumDiam(subclass, inscribedDiam: float) -> float:
+        return (inscribedDiam / np.cos(np.deg2rad(180 / subclass.stepsPerTurn)))
+
+    @classmethod
     def calcPos(subclass, itt: int, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
-        """ input is the number of steps (corners), 'stepsPerTurn' steps would be a full circle, generally: itt=(stepsPerTurn*turns)
-            output is a 2D coordinate along the spiral, starting outwards """
-        ## the easiest way is just to consider it as a circularSpiral, sampled at 6 points per rotation, with the diameter and spacing of a a circumscribed circle (sothat the inscribed circle has the desired diam)
-        # return(circularSpiral.calcPos(itt*np.deg2rad(360/subclass.stepsPerTurn), subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), CCW))
-        ## but i wish to have custom phase-shift based on the number of corners (to orient it straight)
         spacing = calcTraceSpacing(subclass.circumDiam(clearance), subclass.circumDiam(traceWidth))
-        angle = itt*np.deg2rad(360/subclass.stepsPerTurn)
-        circumscribedDiam = subclass.circumDiam(diam-traceWidth)
-        phaseShift = ((np.deg2rad(180/subclass.stepsPerTurn)*(-1 if CCW else 1)) if rotateNthDimSpirals else 0.0)
-        x = (1 if CCW else -1) * np.sin(angle+phaseShift) * ((circumscribedDiam/2) - ((angle/(2*np.pi)) * spacing))
-        y =         -1         * np.cos(angle+phaseShift) * ((circumscribedDiam/2) - ((angle/(2*np.pi)) * spacing))
-        return(x,y)
+        angle = itt * np.deg2rad(360 / subclass.stepsPerTurn)
+        circumscribedDiam = subclass.circumDiam(diam - traceWidth)
+        phaseShift = ((np.deg2rad(180 / subclass.stepsPerTurn) * (-1 if CCW else 1)) if rotateNthDimSpirals else 0.0)
+        x = (1 if CCW else -1) * np.sin(angle + phaseShift) * ((circumscribedDiam / 2) - ((angle / (2 * np.pi)) * spacing))
+        y = -1 * np.cos(angle + phaseShift) * ((circumscribedDiam / 2) - ((angle / (2 * np.pi)) * spacing))
+        return (x, y)
+
     @classmethod
     def calcLength(subclass, itt: int, diam: float, clearance: float, traceWidth: float) -> float:
-        """ returns the length of the spiral at a given itt (without iterating, direct calculation) """
-        return(itt * np.sin(np.deg2rad(180/subclass.stepsPerTurn)) * (subclass.circumDiam(diam) + calcSimpleInnerDiam(itt/subclass.stepsPerTurn, subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), NthDimSpiral())) / 2)
-        ## similar to the circularSpiral, the perimiter (circumference) of an NthDimSpiral can be seem as the perimiter of the average polygon. Then just simplify the equations after inserting itt (calculating turn variable is a little extra)
+        return (itt * np.sin(np.deg2rad(180 / subclass.stepsPerTurn)) * (subclass.circumDiam(diam) + calcSimpleInnerDiam(itt / subclass.stepsPerTurn, subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), NthDimSpiral())) / 2)
 
 class hexagonSpiral(NthDimSpiral):
-    """ (static class) class to hold parameters and functions for hexagonally-shaped (sortof, the angles are not actually 60deg) coils """
-    formulaCoefficients = {'wheeler' : (2.33, 3.82),
-                            'monomial' : (1.28, -1.24, -0.174, 2.47, 1.77, -0.049),
-                            'cur_sheet' : (1.09, 2.23, 0.00, 0.17)}
+    formulaCoefficients = {'wheeler': (2.33, 3.82), 'monomial': (1.28, -1.24, -0.174, 2.47, 1.77, -0.049), 'cur_sheet': (1.09, 2.23, 0.00, 0.17)}
     stepsPerTurn: int = 6
 
 class octagonSpiral(NthDimSpiral):
-    """ (static class) class to hold parameters and functions for octagonally-shaped (sortof, the angles are not actually 45deg) coils """
-    formulaCoefficients = {'wheeler' : (2.25, 3.55),
-                            'monomial' : (1.33, -1.21, -0.163, 2.43, 1.75, -0.049),
-                            'cur_sheet' : (1.07, 2.29, 0.00, 0.19)}
+    formulaCoefficients = {'wheeler': (2.25, 3.55), 'monomial': (1.33, -1.21, -0.163, 2.43, 1.75, -0.049), 'cur_sheet': (1.07, 2.29, 0.00, 0.19)}
     stepsPerTurn: int = 8
 
-# class squareSpiral(NthDimSpiral): # NOTE: this is not a square (same way the hexagon and octagon are also technically illigal), and it has significantly different values (length!) to the hardcoded sqaure above.
-#     formulaCoefficients = {'wheeler' : (2.34, 2.75),
-#                             'monomial' : (1.62, -1.21, -0.147, 2.40, 1.78, -0.030),
-#                             'cur_sheet' : (1.27, 2.07, 0.18, 0.13)}
-#     stepsPerTurn: int = 4
-
-# class triangleSpiral(NthDimSpiral): # this one i'd love to see in action, but i don't have formula coefficients for it
-#     formulaCoefficients = {} # TBD
-#     stepsPerTurn: int = 3
-
-## here is a list of the classes, with a string key to identify them. They are static classes, but creating an instance can't hurt
-shapes = {'square' : squareSpiral(),
-          'hexagon' : hexagonSpiral(),
-          'octagon' : octagonSpiral(),
-          'circle' : circularSpiral()}
-
-
+shapes = {'square': squareSpiral(), 'hexagon': hexagonSpiral(), 'octagon': octagonSpiral(), 'circle': circularSpiral()}
 
 def calcSimpleInnerDiam(turns: int, diam: float, clearance: float, traceWidth: float, shape: _shapeBaseClass) -> float:
-    """ calculate the (approximate) inner diameter of the coil 
-        (in a way that makes sense to me, personally) (same as calcTrueInnerDiam ONLY for squareSpiral) """
     spacing = calcTraceSpacing(clearance, traceWidth)
-    return(((diam/2) - ((turns - (1 if (isinstance(shape, squareSpiral)) else 0)) * spacing) - traceWidth)*2)
-    ## rInner = rOuter - turns*spacing - traceWidth. this is the smallest circle that shares a center with the (naive) outer diam (but not the 'true' outer diam)
-    ## EXCEPT the squareSpiral, which has basically 1 turn less worth of innerdiam
+    return (((diam / 2) - ((turns - (1 if (isinstance(shape, squareSpiral)) else 0)) * spacing) - traceWidth) * 2)
 
 def _calcTrueDiamOffset(clearance: float, traceWidth: float, shape: _shapeBaseClass) -> float:
-    """ both inner- and outer TrueDiam (as defined in the papers) circle does not share a center with the outer (except for the squareSpiral)"""
-    if(isinstance(shape, squareSpiral)):  return(0.0) # for squareSpiral, there is no offset
-    else:  return(calcTraceSpacing(clearance, traceWidth) / 4) # for circular spirals and polygons, still not that complicated
-    ## note: for NthDimSpirals, the calculation should be the same as for circularSpirals (because of the inscribed-circle-based definition)
+    if (isinstance(shape, squareSpiral)):
+        return 0.0
+    else:
+        return calcTraceSpacing(clearance, traceWidth) / 4
 
 def calcTrueInnerDiam(turns: int, diam: float, clearance: float, traceWidth: float, shape: _shapeBaseClass) -> float:
-    """ calculate the (exact) inner diameter of the coil (except for the squareSpiral)
-        it does not share a center with other diameter(s), as it is offset by _calcTrueDiamOffset() away from the start of the spiral 
-        (EXCEPT for the squareSpiral, which just uses the (naive) outer diam and simpleInnerDiam, and no offsets) """
-    ## according to all of the papers, inner diameter is defined as the distance between the innermost point and the nearest trace found when tracing a line through the (spiral) center
-    ##  this means that the inner cirlce does NOT share a center point with the outer diameter
-    return(calcSimpleInnerDiam(turns, diam, clearance, traceWidth, shape) + (_calcTrueDiamOffset(clearance, traceWidth, shape)*2))
+    return calcSimpleInnerDiam(turns, diam, clearance, traceWidth, shape) + (_calcTrueDiamOffset(clearance, traceWidth, shape) * 2)
 
 def calcTrueDiam(diam: float, clearance: float, traceWidth: float, shape: _shapeBaseClass) -> float:
-    """ the diameters (as defined in the papers) is the largest distance from starting point, in line with the center
-        it does not share a center with other diameter(s), as it is offset by _calcTrueDiamOffset() towards the start of the spiral
-        (EXCEPT for the squareSpiral, which just uses the (naive) outer diam and simpleInnerDiam, and no offsets) """
-    return(diam - (_calcTrueDiamOffset(clearance, traceWidth, shape)*2))
+    return (diam - (_calcTrueDiamOffset(clearance, traceWidth, shape) * 2))
 
+def calcReturnTraceLength(turns: int, clearance: float, traceWidth: float) -> float:
+    return (turns * calcTraceSpacing(clearance, traceWidth))
 
-def calcReturnTraceLength(turns: int, clearance: float, traceWidth: float) -> float: # does not really need a function, but perhaps it will avoid silly mistakes in the future (when i've forgotten how this code works)
-    """ calculate the (approximate) length of the return trace (assumed to be a straight downwards line) """
-    return(turns * calcTraceSpacing(clearance, traceWidth))
-
-# def calcTraceClearance(spacing: float, traceWidth: float) -> float: # does not really need a function, but perhaps it will avoid silly mistakes in the future (when i've forgotten how this code works)
-#     """ just a macro for (spacing - traceWidth) """
-#     return(spacing - traceWidth)
-def calcTraceSpacing(clearance: float, traceWidth: float) -> float: # does not really need a function, but perhaps it will avoid silly mistakes in the future (when i've forgotten how this code works)
-    """ just a macro for (clearance + traceWidth) """
-    return(clearance + traceWidth) # 
+def calcTraceSpacing(clearance: float, traceWidth: float) -> float:
+    return (clearance + traceWidth)
 
 def calcCoilTraceResistance(turns: int, diam: float, clearance: float, traceWidth: float, resistConst: float, shape: _shapeBaseClass) -> float:
-    """ calculate the resistance of the coil in Ohms (single layer, return trace ignored)"""
-    coilLength = shape.calcLength(shape.stepsPerTurn*turns, diam, clearance, traceWidth) * distUnitMult # calculate the length of the coil itself (with 1 nice direct calculation (not iteration)) in meters
-    coilResistance = resistConst * (coilLength / (traceWidth*distUnitMult)) # resistance = Rho * length / height * width = resistConst * length/width = resistance in ohms (all dist units in meters!)
-    return(coilResistance)
+    coilLength = shape.calcLength(shape.stepsPerTurn * turns, diam, clearance, traceWidth) * distUnitMult
+    coilResistance = resistConst * (coilLength / (traceWidth * distUnitMult))
+    return coilResistance
 
 def calcTotalResistance(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, resistConst: float, shape: _shapeBaseClass) -> float:
-    """ calculate the resistance of the entire coil in Ohms """
     singleResist = calcCoilTraceResistance(turns, diam, clearance, traceWidth, resistConst, shape)
     coilResistance = singleResist * layers
-    # ## also factor in the vias (TODO)
-    # coilResistance += viaResistance * layers
-    # ## also factor in the return trace (TODO)
-    # if((layers%2)!=0): # if there is an odd number of layers (even layers would eliminate the return trace entirely)
-    #   returnTraceLength = calcReturnTraceLength(turns, clearance, traceWidth)
-    #   returnTraceResistConst = (resistConst if (returnTraceResistConst is None) else returnTraceResistConst) # in case no argument was provided, default to the same resistance constant for both layers
-    #   if(returnTraceMatchResist):
-    #       returnTraceWidth = traceWidth * (returnTraceResistConst / resistConst) # match resistance with the coil layer by changing trace width (generally, PCB's middle layers are thinner, so more width is needed)
-    #   returnTraceResistance = returnTraceResistConst * (returnTraceLength / (returnTraceWidth*distUnitMult))
-    #   coilResistance += returnTraceResistance
-    return(coilResistance)
+    return coilResistance
 
 def calcLayerSpacing(layers: int, PCBthickness: float, copperThickness: float) -> float:
-    """ just a macro for ((PCBthickness - copperThickness) / (layers-1)) """
-    if(layers <= 1): return(0.0)
-    return((PCBthickness - copperThickness) / (layers-1)) # spacing between layers (in mm) (assuming PCBthickness includes all copper layers)
+    if (layers <= 1):
+        return 0.0
+    return ((PCBthickness - copperThickness) / (layers - 1))
 
 def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWidth: float, shape: _shapeBaseClass, formula: str) -> float:
-    """ returns inducance (in Henry) of a PCB coil (single layer)
-        math comes from: https://stanford.edu/~boyd/papers/pdf/inductance_expressions.pdf """
-    if(formula not in shape.formulaCoefficients):  print("could not calcInductanceSingleLayer(), for shape=", shape, " and formula=", formula);  return(-1.0)
-    trueInnerDiamM = calcTrueInnerDiam(turns, diam, clearance, traceWidth, shape) * distUnitMult # inner diameter as defined in the papers
-    trueDiamM = calcTrueDiam(diam, clearance, traceWidth, shape) * distUnitMult # outer diameter as defined in the papers
-    fillFactor = (trueDiamM - trueInnerDiamM) / (trueDiamM + trueInnerDiamM) # fill factor
-    averageDiamM = ((trueDiamM + trueInnerDiamM) / 2) # average diameter of coil
-    coeff = shape.formulaCoefficients[formula] # just a shorter name for more legible math below
-    if(formula == 'wheeler'):
-        return(coeff[0] * magneticConstant * (turns**2) * averageDiamM / (1 + (coeff[1] * fillFactor)))
-    elif(formula == 'monomial'):
-        outputMult = (10**-6) # this formula outputs in mH by default, and i store coeff[0] (a.k.a Beta) as 10^3 times larger than the paper lists it (becuase if i'm scaling up anyway, might as well)
-        return(outputMult * coeff[0] * (trueDiamM**coeff[1]) * ((traceWidth*distUnitMult)**coeff[2]) * (averageDiamM**coeff[3]) * (turns**coeff[4]) * (clearance**coeff[5]))
-    elif(formula == 'cur_sheet'):
-        return((coeff[0] * magneticConstant * (turns**2) * averageDiamM * (np.log(coeff[1]/fillFactor) + (coeff[2]*fillFactor) + (coeff[3]*(fillFactor**2)))) / 2)
-    else: print("impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!");  return(-1.0) # should never happen due to earlier check
+    if (formula not in shape.formulaCoefficients):
+        print("could not calcInductanceSingleLayer(), for shape=", shape, " and formula=", formula)
+        return (-1.0)
+    trueInnerDiamM = calcTrueInnerDiam(turns, diam, clearance, traceWidth, shape) * distUnitMult
+    trueDiamM = calcTrueDiam(diam, clearance, traceWidth, shape) * distUnitMult
+    fillFactor = (trueDiamM - trueInnerDiamM) / (trueDiamM + trueInnerDiamM)
+    averageDiamM = ((trueDiamM + trueInnerDiamM) / 2)
+    coeff = shape.formulaCoefficients[formula]
+    if (formula == 'wheeler'):
+        return (coeff[0] * magneticConstant * (turns**2) * averageDiamM / (1 + (coeff[1] * fillFactor)))
+    elif (formula == 'monomial'):
+        outputMult = (10**-6)
+        return (outputMult * coeff[0] * (trueDiamM**coeff[1]) * ((traceWidth * distUnitMult)**coeff[2]) * (averageDiamM**coeff[3]) * (turns**coeff[4]) * (clearance**coeff[5]))
+    elif (formula == 'cur_sheet'):
+        return ((coeff[0] * magneticConstant * (turns**2) * averageDiamM * (np.log(coeff[1] / fillFactor) + (coeff[2] * fillFactor) + (coeff[3] * (fillFactor**2)))) / 2)
+    else:
+        print("impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!")
+        return (-1.0)
 
-
-################ my formula (Note: based on somewhat limited sample size (see documentation))
 def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
-    """ returns inducance (in Henry) of PCB coil (multi-layer) """
-    singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula) # calculate the inductance of a single layer the same way
-    if(singleInduct < 0):  print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct);  return(-1.0) # should never happen
-    
-    ## instead of using an inverted 4th-order polynomial for the spacing, and another wacky function for the turns-coefficient,
-    ## this assumes the relation between layerSpacing and coupling to be roughly linear (because that is what my sample data showed (see documentation))
-    ## I am aware that another parameter should be taken into account, but my sample size was too limited to definitively identify it...
-    ## therefore, i should mention that my smallest samples (12mm coils) had ~10% prediction overshoot (which i find to be just too much).
-
-    ## the new constants are a 1st-order polynomial (a.k.a. a linear function), applied to each spacing individually (or to the sum, using the triangular number for D0, like i do below)
-    couplingConstant_D : tuple[float] = (1.025485443, -0.201166582) # like (D0,D1) where k = D1*s + D0 (1st order polynomial)
-
-    ## layer stack management stuff is all TODO!
-    # outerLayerCopperThickness = 0.035
-    # innerLayerCopperThickness = 0.0152
-    # layerStack : tuple[float] \
-    #             = (outerLayerCopperThickness,
-    #                 0.0994,
-    #                 innerLayerCopperThickness,
-    #                 0.35,
-    #                 innerLayerCopperThickness,
-    #                 0.1088,
-    #                 innerLayerCopperThickness,
-    #                 0.35,
-    #                 innerLayerCopperThickness,
-    #                 0.0994,
-    #                 outerLayerCopperThickness,
-    #                 )
-    # sumOfSpacings = 0.0
-    # for i in range(0, len(layerStack)-2, 2): # Note: this could go to len(layerStack), but the last entry would skip the j for-loop below entirely.
-    #     for j in range(i+1, len(layerStack)-1, 2):
-    #         spacing = sum(layerStack[i:(j+2)]) # total thickness (incuding copper) from layer i to layer (j+1)
-    #         spacing -= (layerStack[i] + layerStack[(j+1)]) / 2 # subtract half the thickness of both copper layers, (so the calculations are done from the centers of the copper layers)
-    #         sumOfSpacings += spacing
-    #         # sumOfCouplingFactors += (couplingConstant_D[1] * spacing) + couplingConstant_D[0] # DEPRICATED. The sumOfSpacings is used instead (along with a triangular number for D[0], see code below)
-    sumOfSpacings = layerSpacing * ((layers*(layers+1)*(layers-1))/6) # TODO: replace with layer stack! (this assumes equidistant layers, uses a calculation similar to triangular_number to skip forloop)
-
-    triangularNumber = (layers*(layers-1))/2 # triangular number
-    sumOfCouplingFactors = (couplingConstant_D[1] * sumOfSpacings) + (triangularNumber * couplingConstant_D[0]) # preliminary formula (final formula may include more parameters)
-    totalInduct = singleInduct * (layers + 2*sumOfCouplingFactors) # preliminary formula (final formula may include more parameters)
-    return(totalInduct)
+    singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula)
+    if (singleInduct < 0):
+        print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct)
+        return (-1.0)
+    couplingConstant_D = (1.025485443, -0.201166582)
+    sumOfSpacings = layerSpacing * ((layers * (layers + 1) * (layers - 1)) / 6)
+    triangularNumber = (layers * (layers - 1)) / 2
+    sumOfCouplingFactors = (couplingConstant_D[1] * sumOfSpacings) + (triangularNumber * couplingConstant_D[0])
+    totalInduct = singleInduct * (layers + 2 * sumOfCouplingFactors)
+    return totalInduct
 
 def generateCoilFilename(coil: 'coilClass') -> str:
-    """ return a (consistently formatted) string based on the properties of the coil """
-    filename = coil.shape.__class__.__name__[0:2]   # shape (first 2 letters)
-    filename += '_di'+str(int(round(coil.diam, 0)))  # diam (millimeters)
-    filename += '_tu'+str(coil.turns)                # turns
-    filename += '_wi'+str(int(round(coil.traceWidth * 1000, 0))) # traceWidth (micrometers)
-    filename += '_cl'+str(int(round(coil.clearance * 1000, 0)))  # clearance (micrometers)
-    ## the following values are (more) dependent on the production process, and should be verified or ignored:
-    filename += '_cT'+str(int(round(coil.copperThickness * 1000, 0)))  # copper thickness (micrometers)
-    if(coil.layers > 1):
-        filename += '_La'+str(coil.layers)               # Layers
-        filename += '_Pt'+str(int(round(coil.PCBthickness * 1000, 0)))  # PCBthickness (micrometers)
-    ## the following values are only valid if the previous (production-dependent ones) hold true. If not, these should be ignored:
-    filename += '_Re'+str(int(round(coil.calcTotalResistance() * 1000, 0))) # Resistance (milliOhms) (assuming nothing changes!)
-    filename += '_In'+str(int(round(coil.calcInductance() * 1000000000, 0)))  # Inductance (nanoHenry) (assuming nothing changes!)
-    return(filename)
-
-
+    filename = coil.shape.__class__.__name__[0:2]
+    filename += '_di' + str(int(round(coil.diam, 0)))
+    filename += '_tu' + str(coil.turns)
+    filename += '_wi' + str(int(round(coil.traceWidth * 1000, 0)))
+    filename += '_cl' + str(int(round(coil.clearance * 1000, 0)))
+    filename += '_cT' + str(int(round(coil.copperThickness * 1000, 0)))
+    if (coil.layers > 1):
+        filename += '_La' + str(coil.layers)
+        filename += '_Pt' + str(int(round(coil.PCBthickness * 1000, 0)))
+    filename += '_Re' + str(int(round(coil.calcTotalResistance() * 1000, 0)))
+    filename += '_In' + str(int(round(coil.calcInductance() * 1000000000, 0)))
+    return filename
 
 class coilClass:
-    """ a class to hold the parameter set and rendered output of a coil """
-    def __init__(self, turns:int, diam:float, clearance:float, traceWidth:float, layers:int=1, PCBthickness:float=1.6, copperThickness:float=ozCopperToMM(1.0), shape:_shapeBaseClass=shapes['circle'], formula:str='cur_sheet', CCW:bool=False):
-        ## the parameters of the coil are stored as local non-static class variables:
-        self.turns = turns # number of turns in coil
-        self.diam = diam # (mm) diameter (target) of coil
-        # self.spacing = spacing # seems more logical to me, but all the papers prefer to qualify a coil by its clearance (which they call spacing)
-        self.clearance = clearance # (mm) space between traces
-        self.traceWidth = traceWidth # (mm) width of coil trace
-        self.layers = max(layers,1) # number of layers on PCB
-        self.PCBthickness = PCBthickness # (mm) (only used if layers > 1) layerSpacing is calculated as: PCBthickness/(N-1) - copperThickness*(N-1) where N is the number of copper layers (e.g. 2, 4, 6)
-        self.copperThickness = copperThickness # (mm) copper thickness (each layer), defaults to 1oz-worth = 30~34.8um = 0.03~0.0348mm
-        # if((layers>1) and (PCBthickness <= 0.0)):  raise(Exception("please set PCBthickness in coilClass constructor when layers>1"))
-        self.shape = (shape if issubclass(shape.__class__, _shapeBaseClass) else self.__init__.__defaults__[-2]) # determine if the desired shape string is in the formulaCoefficients dict
-        if(self.shape.__class__ != shape.__class__):  print("coilClass init() changing shape from:", shape, "to", self.shape, "because it's not a _shapeBaseClass subclass")
-        self.formula = (formula if (formula in self.shape.formulaCoefficients) else self.__init__.__defaults__[-1]) # determine if the desired formula string is in the formulaCoefficients dict
-        if(self.formula != formula):  print("coilClass init() changing formula from:", formula, "to", self.formula, "because it's not in the "+str(self.shape)+".formulaCoefficients")
-        self.CCW = CCW # whether the coil runs Counter-ClockWise (on the top-layer)
+    def __init__(self, turns: int, diam: float, clearance: float, traceWidth: float, layers: int = 1, PCBthickness: float = 1.6, copperThickness: float = ozCopperToMM(1.0), shape: _shapeBaseClass = shapes['circle'], formula: str = 'cur_sheet', CCW: bool = False):
+        self.turns = turns
+        self.diam = diam
+        self.clearance = clearance
+        self.traceWidth = traceWidth
+        self.layers = max(layers, 1)
+        self.PCBthickness = PCBthickness
+        self.copperThickness = copperThickness
+        self.shape = (shape if issubclass(shape.__class__, _shapeBaseClass) else self.__init__.__defaults__[-2])
+        if (self.shape.__class__ != shape.__class__):
+            print("coilClass init() changing shape from:", shape, "to", self.shape, "because it's not a _shapeBaseClass subclass")
+        self.formula = (formula if (formula in self.shape.formulaCoefficients) else self.__init__.__defaults__[-1])
+        if (self.formula != formula):
+            print("coilClass init() changing formula from:", formula, "to", self.formula, "because it's not in the " + str(self.shape) + ".formulaCoefficients")
+        self.CCW = CCW
 
-    ## the non-static class functions just refer to the static (global) functions above
-    def calcCoilTraceLength(self):  return(self.shape.calcLength(self.turns*self.shape.stepsPerTurn, self.diam, self.clearance, self.traceWidth) * self.layers)
+    def calcCoilTraceLength(self):
+        return self.shape.calcLength(self.turns * self.shape.stepsPerTurn, self.diam, self.clearance, self.traceWidth) * self.layers
 
-    def calcSimpleInnerDiam(self):  return(calcSimpleInnerDiam(self.turns, self.diam, self.clearance, self.traceWidth, self.shape))
-    def calcTrueInnerDiam(self):  return(calcTrueInnerDiam(self.turns, self.diam, self.clearance, self.traceWidth, self.shape))
-    def calcTrueDiam(self):  return(calcTrueDiam(self.diam, self.clearance, self.traceWidth, self.shape))
-    def _calcTrueDiamOffset(self):  return(_calcTrueDiamOffset(self.clearance, self.traceWidth, self.shape))
+    def calcSimpleInnerDiam(self):
+        return calcSimpleInnerDiam(self.turns, self.diam, self.clearance, self.traceWidth, self.shape)
 
-    def calcTraceSpacing(self):  return(calcTraceSpacing(self.clearance, self.traceWidth))
-    def calcReturnTraceLength(self):  return(calcReturnTraceLength(self.turns, self.clearance, self.traceWidth) if ((self.layers%2)!=0) else 0.0) # coils with an even number of layers don't need a return trace
-    
-    def calcTotalResistance(self):  return(calcTotalResistance(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, RhoCopper / (self.copperThickness*distUnitMult), self.shape))
-    def calcLayerSpacing(self):  return(calcLayerSpacing(self.layers,self.PCBthickness,self.copperThickness))
-    def calcInductanceSingleLayer(self):  return(calcInductanceSingleLayer(self.turns, self.diam, self.clearance, self.traceWidth, self.shape, self.formula))
-    def calcInductance(self):  return(self.calcInductanceSingleLayer() if (self.layers == 1) else \
-                                      calcInductanceMultilayer(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, self.calcLayerSpacing(), self.shape, self.formula))
-    
-    ## some ways of rendering the coil:
+    def calcTrueInnerDiam(self):
+        return calcTrueInnerDiam(self.turns, self.diam, self.clearance, self.traceWidth, self.shape)
+
+    def calcTrueDiam(self):
+        return calcTrueDiam(self.diam, self.clearance, self.traceWidth, self.shape)
+
+    def _calcTrueDiamOffset(self):
+        return _calcTrueDiamOffset(self.clearance, self.traceWidth, self.shape)
+
+    def calcTraceSpacing(self):
+        return calcTraceSpacing(self.clearance, self.traceWidth)
+
+    def calcReturnTraceLength(self):
+        return calcReturnTraceLength(self.turns, self.clearance, self.traceWidth) if ((self.layers % 2) != 0) else 0.0
+
+    def calcTotalResistance(self):
+        return calcTotalResistance(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, RhoCopper / (self.copperThickness * distUnitMult), self.shape)
+
+    def calcLayerSpacing(self):
+        return calcLayerSpacing(self.layers, self.PCBthickness, self.copperThickness)
+
+    def calcInductanceSingleLayer(self):
+        return calcInductanceSingleLayer(self.turns, self.diam, self.clearance, self.traceWidth, self.shape, self.formula)
+
+    def calcInductance(self):
+        return self.calcInductanceSingleLayer() if (self.layers == 1) else calcInductanceMultilayer(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, self.calcLayerSpacing(), self.shape, self.formula)
+
     def renderAsCoordinateList(self, reverseDirection=False, angleResOverride: float = None) -> list[tuple[float, float]]:
-        if(self.shape.isDiscrete):
-            if(angleResOverride is not None):  print("renderAsCoordinateList() ignoring angleResOverride, shape not circular")
-            return([self.shape.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn*self.turns + 1)]) # a simple forloop to render all the corner positions
-        else: # for continous shapes (e.g. circularSpiral)
+        if self.shape.isDiscrete:
+            if angleResOverride is not None:
+                print("renderAsCoordinateList() ignoring angleResOverride, shape not circular")
+            return [self.shape.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
+        else:
             angleRes = (angleResOverride if (angleResOverride is not None) else angleRenderResDefault)
-            return([self.shape.calcPos(i*angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn*self.turns)/angleRes, 0)) + 1)]) # renders the continous shape
-    # def renderAsPolygon(self):
-    #     # TODO
+            return [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
 
-    ## some ways of saving/exporting the coil
-    def generateCoilFilename(self):  return(generateCoilFilename(self))
-    def saveDXF(self) -> list[str]:
-        import DXFexporter as DXFexp
-        filenames: list[str] = []
-        for outputFormat in DXFexp.DXFoutputFormats:
-            filenames += DXFexp.saveDXF(self, outputFormat)
-        return(filenames)
-    def to_excel(self, filename:str = None) -> str:
-        """ produce an excel file with only 1 row of data; this coil """
-        import excelExporter as excExp
-        if(filename is None):  filename = self.generateCoilFilename() + excExp.fileExtension
-        excExp.exportCoils([self,], filename)
-    def imwrite(self, *arg) -> list[np.ndarray]:
-        """ just a macro that imports cv2exporter.py and runs .imwrite() with the provided arguments """
-        import cv2exporter as cv2exp
-        cv2exp.imwrite(self, *arg)
+    def generateCoilFilename(self):
+        return generateCoilFilename(self)
 
-        # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=0.9, layers=2, PCBthickness=0.6, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 2 layer PCB
-        # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=0.9, layers=4, PCBthickness=0.8, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 4 layer PCB
-        # coil = coilClass(turns=8, diam=24, clearance=0.10, traceWidth=1.0, layers=6, PCBthickness=1.2, copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # 6 layer PCB
-        # coil = coilClass(turns=9, diam=35, clearance=0.15, traceWidth=1.15, layers=2, PCBthickness=0.13, copperThickness=0.045, shape=shapes['circle'], formula='cur_sheet') # WLP final one 35mm (0.13mm PA) (NOT USED)
-        # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=1.35, layers=2, PCBthickness=0.13, copperThickness=0.045, shape=shapes['circle'], formula='cur_sheet') # WLP final one 40mm (0.13mm PA) (USED PCB R01)
-        # coil = coilClass(turns=9, diam=40, clearance=0.15, traceWidth=1.35, layers=2, PCBthickness=0.1, copperThickness=0.018, shape=shapes['circle'], formula='cur_sheet') # PCB R01 with 0.5oz copper
-        # coil = coilClass(turns=11, diam=35, clearance=60/56, traceWidth=10/56, layers=1,                 copperThickness=0.0015, shape=shapes['square'], formula='cur_sheet') # NFC antenna phase 1 (PET)
-        # coil = coilClass(turns=7, diam=35, clearance=0.6, traceWidth=10/56, layers=1,                    copperThickness=0.0025, shape=shapes['square'], formula='cur_sheet') # new design 1L thicker
-        # coil = coilClass(turns=4, diam=35, clearance=1.25, traceWidth=0.25, layers=2, PCBthickness=0.05, copperThickness=0.0020, shape=shapes['square'], formula='cur_sheet') # new design 2L (slightly thick!)
-        # coil = coilClass(turns=3, diam=35, clearance=0.75, traceWidth=0.25, layers=2, PCBthickness=0.05, copperThickness=0.0015, shape=shapes['square'], formula='cur_sheet') # new design 2L alt
-        # coil = coilClass(turns=8, diam=24, clearance=0.10, traceWidth=1.0, layers=6, PCBthickness=1.2, copperThickness=0.015, shape=shapes['circle'], formula='cur_sheet') # 6L test sample (uneven spacing!)
-        # coil = coilClass(turns=1, diam=40, clearance=0.30, traceWidth=1.0, layers=1,                   copperThickness=0.030, shape=shapes['circle'], formula='cur_sheet') # render test
+def main():
+    root = tk.Tk()
+    gui = CoilParameterGUI(root)
+    root.mainloop()
 
+    coil_params = gui.params
 
+    turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = coil_params
+    turns = int(turns)
+    diameter = float(diameter)
+    clearance = float(clearance)
+    trace_width = float(trace_width)
+    layers = int(layers)
+    pcb_thickness = float(pcb_thickness)
+    copper_thickness = float(copper_thickness)
+    shape = shapes[shape]
+    formula = formula
 
+    coil = coilClass(turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula)
+    print(f"Generated coil with parameters: {coil}")
 
-###### TKINTER ######
+    if visualization:
+        import pygameRenderer as PR
+        import pygameUI as UI
 
-# Tkinter needs multiprocessing to work properly
-
-from multiprocessing import Process, Queue
-import time
-import queue
-
-def run_tkinter(shared_data, task_queue):
-    print("Running Tkinter...")
-    import tkinter as tk
-    import importlib
-    module_name = 'tkinter_coil_gui'
-    module = importlib.import_module(module_name)
-    CoilUpdater = module.CoilUpdater
-    root = tk.Tk()   # Tkinter GUI Addition
-    app = CoilUpdater(master=root, shared_data=shared_data)
-    while True:
-        try:
-            # Execute any functions put in the queue
-            task = task_queue.get_nowait()
-            root.after_idle(task)
-        except queue.Empty:
-            pass
-        root.update_idletasks()
-        root.update()
-
-def run_pygame(shared_data, task_queue, windowHandler=None):
-    print("Running Pygame...")
-    import pygameRenderer as PR # rendering code
-    import pygameUI as UI # UI handling code
-    print("Imported Pygame modules...")
-    if windowHandler is None:
         windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
-    drawer = PR.pygameDrawer(windowHandler)
-    print("Initialized Pygame window...")
-    drawer.localVar = shared_data['coil'] # not my best code...
-    drawer.localVarUpdated = False # a flag for the UI to trigger a re-calculation
-    drawer.debugText = drawer.makeDebugText(shared_data['coil'])
-    drawer.lastFilename = shared_data['coil'].generateCoilFilename()
-    while True:
-        try:
-            # Execute any functions put in the queue
-            task = task_queue.get_nowait()
-            drawer.renderBG() # draw background
-            drawer.drawLineList(renderedLineLists)
-            drawer.renderFG() # draw foreground (text and stuff)
-            windowHandler.frameRefresh()
-            UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
-            if(drawer.localVarUpdated):
-                drawer.localVarUpdated = False
-                print("Pygame window updated...")
-        except queue.Empty:
-            pass
-        except Exception as e:
-            print(f"Error in Pygame loop: {e}")
-            shared_data['coil'] = drawer.localVar
-            renderedLineLists = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
-            drawer.debugText = drawer.makeDebugText(shared_data['coil'])
-            drawer.lastFilename = shared_data['coil'].generateCoilFilename()
-
-###### Main Loop #######
-if __name__ == "__main__": # normal usage
-    try:
-        coil = coilClass(turns=9, diam=40, clearance=0.30, traceWidth=1.0, layers=1, copperThickness=0.030, shape=shapes['hexagon'], formula='cur_sheet') # single layer on PA
-        
-######Tkinter GUI Addition#####
-        import threading
-        import importlib
-        import pygameRenderer as PR # rendering code
-        import pygameUI as UI # UI handling code
-        import sys
-
-        module_name = 'tkinter_coil_gui'
-        
-        module = importlib.import_module(module_name)
-        
-        CoilUpdater = module.CoilUpdater
-
-        # Define shared_data and assign the coil object to it
-        shared_data = {'coil': coil}
-        renderedLineLists: list[list[tuple[int,int]]] = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
-
-        # Create a queue
-        task_queue = queue.Queue()
-
-        # Initialize windowHandler and drawer
-        import pygameRenderer as PR # rendering code
-        import pygameUI as UI # UI handling code
-        try:
-            windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
-        except Exception as e:
-            print(f"Error initializing Pygame window: {e}")
-            sys.exit(1)
-
         drawer = PR.pygameDrawer(windowHandler)
 
-        # Initialize loopStart
-        loopStart = time.time()
+        renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
+        drawer.localVar = coil
+        drawer.localVarUpdated = False
+        drawer.debugText = drawer.makeDebugText(coil)
+        drawer.lastFilename = coil.generateCoilFilename()
 
-        p1 = Process(target=run_tkinter, args=(shared_data, task_queue)) # Multiprocessing for Tkinter
-        p2 = Process(target=run_pygame, args=(shared_data, task_queue, windowHandler)) # Multiprocessing for Pygame
-
-        p1.start() # Start Tkinter
-        p2.start() # Start Pygame
-
-        # visualization loop:
         while windowHandler.keepRunning:
-            try:
-                # Execute any functions put in the queue
-                task = task_queue.get_nowait()
-                drawer.renderBG() # draw background
+            loopStart = time.time()
+            drawer.renderBG()
+            drawer.drawLineList(renderedLineLists)
+            drawer.renderFG()
+            windowHandler.frameRefresh()
+            UI.handleAllWindowEvents(drawer)
+            if drawer.localVarUpdated:
+                drawer.localVarUpdated = False
+                coil = drawer.localVar
+                renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
+                drawer.debugText = drawer.makeDebugText(coil)
+                drawer.lastFilename = coil.generateCoilFilename()
+            loopEnd = time.time()
+            if (loopEnd - loopStart) < (1 / (60 * 1.05)):
+                time.sleep((1 / 60) - (loopEnd - loopStart))
+    else:
+        print("coil details:")
+        print(f"resistance [mOhm]: {round(coil.calcTotalResistance() * 1000, 3)}")
+        print(f"inductance [uH]: {round(coil.calcInductance() * 1000000, 3)}")
+        print(f"induct/resist [uH/Ohm]: {round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 3)}")
+        print(f"induct/radius [uH/mm]: {round(coil.calcInductance() * 1000000 / (coil.diam / 2), 3)}")
 
-                drawer.drawLineList(renderedLineLists)
-
-                drawer.renderFG() # draw foreground (text and stuff)
-                windowHandler.frameRefresh()
-                UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
-                if(drawer.localVarUpdated):
-                    drawer.localVarUpdated = False
-                    shared_data['coil'] = drawer.localVar
-                    renderedLineLists = [shared_data['coil'].renderAsCoordinateList(False), shared_data['coil'].renderAsCoordinateList(True)]
-                    drawer.debugText = drawer.makeDebugText(shared_data['coil'])
-                    drawer.lastFilename = shared_data['coil'].generateCoilFilename()
-
-                loopEnd = time.time() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
-                targetFPS = 60
-                if((loopEnd-loopStart) < (1/(targetFPS*1.05))): #60FPS limiter (optional)
-                    time.sleep((1/targetFPS)-(loopEnd-loopStart))
-            except queue.Empty:
-                pass        
-
-        p1.join() # Wait for Tkinter to finish
-        p2.join() # Wait for Pygame to finish
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-######### End of TKINTER #########
-        if(visualization):
-            import pygameRenderer as PR # rendering code
-            import pygameUI as UI # UI handling code
-
-            ## some UI window initialization
-            windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
-            drawer = PR.pygameDrawer(windowHandler)
-            
-            drawer.localVar = coil # not my best code...
-            drawer.localVarUpdated = False # a flag for the UI to trigger a re-calculation
-            drawer.debugText = drawer.makeDebugText(coil)
-            drawer.lastFilename = coil.generateCoilFilename()
-
-            ## visualization loop:
-            while(windowHandler.keepRunning):
-                loopStart = time.time()
-                drawer.renderBG() # draw background
-
-                drawer.drawLineList(renderedLineLists)
-
-                drawer.renderFG() # draw foreground (text and stuff)
-                # drawer.redraw() # render all elements
-                windowHandler.frameRefresh()
-                UI.handleAllWindowEvents(drawer) # handle all window events like key/mouse presses, quitting, resizing, etc.
-                if(drawer.localVarUpdated):
-                    drawer.localVarUpdated = False
-                    coil = drawer.localVar
-                    renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
-                    drawer.debugText = drawer.makeDebugText(coil)
-                    drawer.lastFilename = coil.generateCoilFilename()
-
-                    # # debug for the calcLength() functions:
-                    # from pygameRenderer import distAngleBetwPos
-                    # sumOfLengths = 0
-                    # for i in range(1, len(renderedLineLists[0])):
-                    #     sumOfLengths += distAngleBetwPos(renderedLineLists[0][i-1], renderedLineLists[0][i])[0] # sum length manually
-                    # print("sumOfLengths:", sumOfLengths)
-                
-                loopEnd = time.time() #this is only for the 'framerate' limiter (time.sleep() doesn't accept negative numbers, this solves that)
-                targetFPS = 60
-                if((loopEnd-loopStart) < (1/(targetFPS*1.05))): #60FPS limiter (optional)
-                    time.sleep((1/targetFPS)-(loopEnd-loopStart))
-                # elif((loopEnd-loopStart) > (1/5)):
-                #     print("main process running slow", 1/(loopEnd-loopStart))
-        else: # no visualization
-            print("coil details:")
-            print("resistance [mOhm]: "+str(round(coil.calcTotalResistance() * 1000, 3)))
-            print("inductance [uH]: "+str(round(coil.calcInductance() * 1000000, 3)))
-            print("induct/resist [uH/Ohm]: "+str(round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 3)))
-            print("induct/radius [uH/mm]: "+str(round(coil.calcInductance() * 1000000 / (coil.diam/2), 3)))
-    finally:
-        if(visualization):
-            try:
-                windowHandler.end() # correctly shut down pygame window
-                print("stopped pygame window")
-            except:
-                print("couldn't run windowHandler.end()")
-
-
+if __name__ == "__main__":
+    main()
