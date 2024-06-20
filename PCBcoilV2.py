@@ -249,14 +249,9 @@ class coilClass:
     def generateCoilFilename(self):
         return generateCoilFilename(self)
 
-def main():
-    root = tk.Tk()
-    gui = CoilParameterGUI(root)
-    root.mainloop()
-
-    coil_params = gui.params
-
-    turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = coil_params
+def update_coil_params(params):
+    global coil, renderedLineLists, drawer
+    turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = params
     turns = int(turns)
     diameter = float(diameter)
     clearance = float(clearance)
@@ -268,7 +263,24 @@ def main():
     formula = formula
 
     coil = coilClass(turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula)
-    print(f"Generated coil with parameters: {coil}")
+    print(f"Updated coil with parameters: {coil}")
+
+    renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
+    drawer.localVar = coil
+    drawer.localVarUpdated = True
+    drawer.debugText = drawer.makeDebugText(coil)
+    drawer.lastFilename = coil.generateCoilFilename()
+
+def main():
+    global coil, renderedLineLists, drawer
+
+    root = tk.Tk()
+    app = CoilParameterGUI(root, update_coil_params)
+    root.after(0, root.deiconify)
+    
+    initial_params = [
+        9, 40, 0.15, 0.9, 2, 0.6, 0.030, 'circle', 'cur_sheet'
+    ]
 
     if visualization:
         import pygameRenderer as PR
@@ -276,12 +288,7 @@ def main():
 
         windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
         drawer = PR.pygameDrawer(windowHandler)
-
-        renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
-        drawer.localVar = coil
-        drawer.localVarUpdated = False
-        drawer.debugText = drawer.makeDebugText(coil)
-        drawer.lastFilename = coil.generateCoilFilename()
+        update_coil_params(initial_params)
 
         while windowHandler.keepRunning:
             loopStart = time.time()
@@ -290,16 +297,18 @@ def main():
             drawer.renderFG()
             windowHandler.frameRefresh()
             UI.handleAllWindowEvents(drawer)
+
             if drawer.localVarUpdated:
                 drawer.localVarUpdated = False
-                coil = drawer.localVar
-                renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
-                drawer.debugText = drawer.makeDebugText(coil)
-                drawer.lastFilename = coil.generateCoilFilename()
+
             loopEnd = time.time()
             if (loopEnd - loopStart) < (1 / (60 * 1.05)):
                 time.sleep((1 / 60) - (loopEnd - loopStart))
+
+            root.update()
+
     else:
+        update_coil_params(initial_params)
         print("coil details:")
         print(f"resistance [mOhm]: {round(coil.calcTotalResistance() * 1000, 3)}")
         print(f"inductance [uH]: {round(coil.calcInductance() * 1000000, 3)}")
