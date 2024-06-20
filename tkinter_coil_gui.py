@@ -1,41 +1,54 @@
 import tkinter as tk
 from tkinter import ttk
-from PCBcoilV2 import coilClass, shapes  # Make sure PCBcoilV2.py is in the same directory or properly referenced
-from tkinter import Tk
 
+class CoilParameterGUI:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Coil Parameter Input")
 
+        self.defaults = {
+            "Turns": 9,
+            "Diameter": 40,
+            "Clearance": 0.15,
+            "Trace Width": 0.9,
+            "Layers": 2,
+            "PCB Thickness": 0.6,
+            "Copper Thickness": 0.030,
+            "Shape": 'circle',
+            "Formula": 'cur_sheet'
+        }
 
-class CoilUpdater:
-     def __init__(self, master, shared_data=None):
-          self.master = master
-          self.master.title("Coil Parameter Updater")
+        self.create_widgets()
 
-          self.coil = coilClass(turns=10, diam=50, clearance=0.1, traceWidth=0.5, shape=shapes['circle'])
-          self.shared_data = shared_data
-          # Layout configuration
-          ttk.Label(self.master, text="Turns:").grid(row=0, column=0, padx=10, pady=10)
-          self.turns_var = tk.IntVar(value=self.coil.turns)
-          ttk.Entry(self.master, textvariable=self.turns_var).grid(row=0, column=1)
+    def create_widgets(self):
+        self.param_labels = [
+            "Turns", "Diameter", "Clearance", "Trace Width",
+            "Layers", "PCB Thickness", "Copper Thickness",
+            "Shape", "Formula"
+        ]
+        self.param_entries = []
 
-          ttk.Label(self.master, text="Diameter:").grid(row=1, column=0, padx=10, pady=10)
-          self.diam_var = tk.DoubleVar(value=self.coil.diam)
-          ttk.Entry(self.master, textvariable=self.diam_var).grid(row=1, column=1)
+        for idx, label in enumerate(self.param_labels):
+            tk.Label(self.master, text=label).grid(row=idx, column=0)
+            entry = tk.Entry(self.master)
+            entry.grid(row=idx, column=1)
+            entry.insert(0, str(self.defaults[label]))  # Insert default value
+            self.param_entries.append(entry)
 
-          ttk.Label(self.master, text="Clearance:").grid(row=2, column=0, padx=10, pady=10)
-          self.clearance_var = tk.DoubleVar(value=self.coil.clearance)
-          ttk.Entry(self.master, textvariable=self.clearance_var).grid(row=2, column=1)
+        self.submit_button = tk.Button(self.master, text="Submit", command=self.submit)
+        self.submit_button.grid(row=len(self.param_labels), columnspan=2)
 
-          ttk.Label(self.master, text="Trace Width:").grid(row=3, column=0, padx=10, pady=10)
-          self.trace_width_var = tk.DoubleVar(value=self.coil.traceWidth)
-          ttk.Entry(self.master, textvariable=self.trace_width_var).grid(row=3, column=1)
+    def submit(self):
+        self.params = [entry.get() for entry in self.param_entries]
+        print("Submitted parameters:", self.params)  # This is for debugging
 
-          ttk.Button(self.master, text="Update Coil", command=self.update_coil).grid(row=4, columnspan=2, padx=10, pady=10)
+        # Here you would normally update the coil parameters in PCBcoilV2.py
+        self.update_coil_parameters()
 
-     def update_coil(self):
-          # Update the coil object with new values from the GUI
-          self.coil.turns = self.turns_var.get()
-          self.coil.diam = self.diam_var.get()
-          self.coil.clearance = self.clearance_var.get()
-          self.coil.traceWidth = self.trace_width_var.get()
-          print("Coil updated:", self.coil)
-          self.shared_data['coil'] = self.coil
+    def update_coil_parameters(self):
+        self.master.quit()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = CoilParameterGUI(root)
+    root.mainloop()
