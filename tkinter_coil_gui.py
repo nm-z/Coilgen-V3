@@ -67,7 +67,6 @@ class CoilParameterGUI:
             self.loop_diameter_entry.config(state='normal')
             self.loop_diameter_entry.delete(0, tk.END)
             self.loop_diameter_entry.insert(0, str(loop_diameter))
-            self.loop_diameter_entry.config(state='disabled')
         else:
             self.loop_diameter_entry.config(state='normal')
             self.loop_diameter_entry.delete(0, tk.END)
@@ -91,4 +90,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     gui = CoilParameterGUI(root, print_params)
     root.mainloop()
-

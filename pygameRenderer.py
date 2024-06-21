@@ -165,6 +165,8 @@ class pygameWindowHandler():
 
 
 class pygameDrawer():
+    last_print_time = 0  # Static variable to track the last print time
+
     def __init__(self, windowHandler: pygameWindowHandler, drawSize:tuple[int,int]=None, drawOffset:tuple[int,int]=(0,0), sizeScale:float=15, invertYaxis:bool=True):
         self.windowHandler = windowHandler
         self.drawSize :tuple[int,int]= ((int(drawSize[0]),int(drawSize[1])) if (drawSize is not None) else self.windowHandler.oldWindowSize) # width and height of the display area (does not need to be 100% of the window)
@@ -455,43 +457,49 @@ class pygameDrawer():
     #     arcStartAngle = distAngleBetwPos(adjCenterPos, endPos)[1];   arcEndAngle = distAngleBetwPos(adjCenterPos, startPos)[1]
     #     pygame.draw.arc(self.windowHandler.window, lineColor, boundingRect, arcStartAngle, arcEndAngle, int(lineWidthReal * self.sizeScale))
 
-    def drawLineList(self, lineLists: list[list[tuple[int,int]]]):
+
+    def drawLineList(self, lineLists: list[list[tuple[int, int]]], debug=False):
         """draw a series of lines (used for rendering coils)"""
-        from __main__ import coilClass # bad code!
-        coilToDraw: 'coilClass' = self.localVar # if it crashes here, then it's probably time to fix this whole mess (rewrite the rendering class interaction with __main__)
-        if(len(np.array(lineLists).shape) < 3):  lineLists = [lineLists, coilToDraw.renderAsCoordinateList(True)] # NOTE: backwards-compatibility hack for V0 & V1. Terrible, i hate it, it should probably work
-        if((len(lineLists) < 1) or (len(lineLists) < min(coilToDraw.layers, 2))):   print("can't drawLineList(), not enough lineLists provided");   return
-        if(len(lineLists[0]) < 2):   print("can't drawLineList(), lineLists[0] too short!");   return
-        
-        ## deleteme:
-        # N = 6; L = 20.0
-        # for i in range(N):
-        #     # pygame.draw.line(self.windowHandler.window, [127,127,127], self.realToPixelPos(np.zeros(2)), self.realToPixelPos(distAnglePosToPos(20.0, i*2*np.pi/N, np.zeros(2))), 2)
-        #     self._dashedLine([127,127,127], self.realToPixelPos(np.zeros(2)), self.realToPixelPos(distAnglePosToPos(L, i*2*np.pi/N, np.zeros(2))), 2, L*self.sizeScale/20, 0.5) # dashed line (looks bad, adds nothing here)
-        isCircular = (True if isinstance(coilToDraw.shape.stepsPerTurn, float) else False) # only smooth corners for squares
+        from __main__ import coilClass  # Import statement
+        coilToDraw: 'coilClass' = self.localVar  # Access the current coil object
+
+        if len(lineLists) < 2:
+            if debug:
+                print("can't drawLineList(), not enough lineLists provided")
+            return
+
         lineWidthPixels = int(coilToDraw.traceWidth * self.sizeScale)
-        layerAdjust: Callable[[tuple[float,float],int], tuple[float,float]] = lambda pos, currentLayer : (pos[0] + coilToDraw.diam*currentLayer, pos[1]) # offset the positions of the different layers to make them visible
-        if((coilToDraw.layers%2)!=0): # only in case of an un-even number of layers
-            pygame.draw.line(self.windowHandler.window, self.layerColors[coilToDraw.layers % len(self.layerColors)], self.realToPixelPos((lineLists[0][-1][0], lineLists[0][0][1])), self.realToPixelPos(lineLists[0][-1]), lineWidthPixels) # draw return trace first
+
+        # Draw each layer
         for layerItt in range(coilToDraw.layers):
-            currentLayer = coilToDraw.layers-1-layerItt;  currentLayerColor = self.layerColors[currentLayer % len(self.layerColors)] # draw layers back to front
-            lineList = lineLists[currentLayer % 2] # one list is CW and the other is CCW. (NOTE: this replaces the mirroring of layerAdjust in previous versions)
-            for i in range(len(lineList)-1):
-                # if(i > int((pygame.mouse.get_pos()[0] / self.drawSize[0]) * len(lineList))):  break   # drawing debug
-                # if(isCircular): # the arc drawing code works, but doesn't look that much better (pygame kinda sucks). ALSO, it runs slow as hell
-                #     self._shortArc(currentLayerColor, layerAdjust(lineList[i], currentLayer), layerAdjust(lineList[i+1], currentLayer), np.zeros(2), coilToDraw.traceWidth)
-                # else: # squares and other (regular) polygons
-                startPos = self.realToPixelPos(layerAdjust(lineList[i], currentLayer));   endPos = self.realToPixelPos(layerAdjust(lineList[i+1], currentLayer))
+            currentLayer = coilToDraw.layers - 1 - layerItt
+            currentLayerColor = self.layerColors[currentLayer % len(self.layerColors)]
+            try:
+                lineList = lineLists[currentLayer]
+            except IndexError:
+                if debug:
+                    print(f"Warning: Not enough line lists to draw layer {currentLayer}")
+                continue  # Skip to the next layer
+            if debug and layerItt % 2 == 0:  # Optionally reduce verbosity by printing every other layer
+                print(f"Drawing layer {currentLayer} with {len(lineList)} points")
+            for i in range(len(lineList) - 1):
+                startPos = self.realToPixelPos(lineList[i])
+                endPos = self.realToPixelPos(lineList[i + 1])
                 pygame.draw.line(self.windowHandler.window, currentLayerColor, startPos, endPos, lineWidthPixels)
-                if(not isCircular):
-                    pygame.draw.ellipse(self.windowHandler.window, currentLayerColor, [ASA(-((lineWidthPixels-2)/2), endPos), [lineWidthPixels, lineWidthPixels]]) # draw a little circle in the corners for a smoother look
-        
-        ## deleteme also:
-        diamDebugColor = [127,127,127]
-        pygame.draw.circle(self.windowHandler.window, diamDebugColor, self.realToPixelPos(np.zeros(2)).astype(int), int(coilToDraw.diam*self.sizeScale/2), 2) # (naive) outer diam
-        pygame.draw.circle(self.windowHandler.window, diamDebugColor, self.realToPixelPos(np.zeros(2)).astype(int), int(coilToDraw.calcSimpleInnerDiam()*self.sizeScale/2), 2) # simple inner diam
-        pygame.draw.circle(self.windowHandler.window, diamDebugColor, self.realToPixelPos((0, -coilToDraw._calcTrueDiamOffset())).astype(int), int(coilToDraw.calcTrueDiam()*self.sizeScale/2), 2) # what the papers define as the outer diam
-        pygame.draw.circle(self.windowHandler.window, diamDebugColor, self.realToPixelPos((0, coilToDraw._calcTrueDiamOffset())).astype(int), int(coilToDraw.calcTrueInnerDiam()*self.sizeScale/2), 2) # what the papers define as the inner diam
+
+        # Check if loop antenna is enabled and draw it
+        if coilToDraw.loop_enabled and len(lineLists) > coilToDraw.layers:
+            loop_antenna_coords = lineLists[coilToDraw.layers]
+            loop_color = (255, 0, 0)  # Color for the loop antenna, e.g., red
+            if debug and len(loop_antenna_coords) > 0:
+                print(f"Drawing loop antenna with {len(loop_antenna_coords)} points")
+            for i in range(len(loop_antenna_coords) - 1):
+                startPos = self.realToPixelPos(loop_antenna_coords[i])
+                endPos = self.realToPixelPos(loop_antenna_coords[i + 1])
+                pygame.draw.line(self.windowHandler.window, loop_color, startPos, endPos, lineWidthPixels)
+
+        # Clear the update flag after drawing
+        self.localVarUpdated = False
 
     def renderBG(self, drawSpeedTimers: list = None):
         self._updateViewOffset() #handle mouse dragging

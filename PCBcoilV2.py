@@ -193,7 +193,7 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     return filename
 
 class coilClass:
-    def __init__(self, turns: int, diam: float, clearance: float, traceWidth: float, layers: int = 1, PCBthickness: float = 1.6, copperThickness: float = ozCopperToMM(1.0), shape: _shapeBaseClass = shapes['circle'], formula: str = 'cur_sheet', CCW: bool = False, loop_enabled: bool = False, loop_diameter: float = 0.0):
+    def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0):
         self.turns = turns
         self.diam = diam
         self.clearance = clearance
@@ -201,15 +201,13 @@ class coilClass:
         self.layers = max(layers, 1)
         self.PCBthickness = PCBthickness
         self.copperThickness = copperThickness
-        self.shape = (shape if issubclass(shape.__class__, _shapeBaseClass) else self.__init__.__defaults__[-3])
-        if (self.shape.__class__ != shape.__class__):
-            print("coilClass init() changing shape from:", shape, "to", self.shape, "because it's not a _shapeBaseClass subclass")
-        self.formula = (formula if (formula in self.shape.formulaCoefficients) else self.__init__.__defaults__[-2])
-        if (self.formula != formula):
-            print("coilClass init() changing formula from:", formula, "to", self.formula, "because it's not in the " + str(self.shape) + ".formulaCoefficients")
+        self.shape = shape
+        self.formula = formula
         self.CCW = CCW
         self.loop_enabled = loop_enabled
         self.loop_diameter = loop_diameter
+        self.shape = shapes.get(shape, shapes['circle'])
+
 
     def calcCoilTraceLength(self):
         return self.shape.calcLength(self.turns * self.shape.stepsPerTurn, self.diam, self.clearance, self.traceWidth) * self.layers
@@ -244,26 +242,39 @@ class coilClass:
     def calcInductance(self):
         return self.calcInductanceSingleLayer() if (self.layers == 1) else calcInductanceMultilayer(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, self.calcLayerSpacing(), self.shape, self.formula)
 
-    def renderAsCoordinateList(self, reverseDirection=False, angleResOverride: float = None) -> list[tuple[float, float]]:
+    def renderAsCoordinateList(self, reverseDirection=False, angleResOverride: float = None):
         if self.shape.isDiscrete:
             if angleResOverride is not None:
                 print("renderAsCoordinateList() ignoring angleResOverride, shape not circular")
-            return [self.shape.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
+            coordinates = [self.shape.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
+            if len(coordinates) % 10 == 0:  # Example condition: print only if the number of coordinates is a multiple of 10
+                print(f"renderAsCoordinateList (Discrete): {len(coordinates)} points")
+            return coordinates
         else:
-            angleRes = (angleResOverride if (angleResOverride is not None) else angleRenderResDefault)
-            return [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
-
+            angleRes = angleResOverride if angleResOverride else angleRenderResDefault
+            coordinates = [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
+            if len(coordinates) % 10 == 0:  # Same example condition
+                print(f"renderAsCoordinateList (Continuous): {len(coordinates)} points")
+            return coordinates
+        
     def render_loop_antenna(self):
-        loop_radius = self.loop_diameter / 2
+        loop_diameter = self.diam + 2 * self.traceWidth  # Increase diameter to move loop outside the main coil
+        x_offset = self.diam / 2 + loop_diameter / 2  # Calculate x offset to position loop beside the main coil
+
+        loop_radius = loop_diameter / 2
         points = []
         steps = 100  # Number of points to draw the circle
         for step in range(steps + 1):  # Include the last point to close the loop
             angle = 2 * np.pi * step / steps
-            x = loop_radius * np.cos(angle)
+            x = loop_radius * np.cos(angle) + x_offset  # Add offset to x-coordinate
             y = loop_radius * np.sin(angle)
             points.append((x, y))
-        return points
-
+        if len(points) == 0:  # Debug check
+            print("Error: No points generated for loop antenna")
+        return points  # Return as a flat list of points    
+    
+    
+    
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
 
@@ -287,32 +298,38 @@ class coilClass:
 
 
 def update_coil_params(params):
-    global coil, renderedLineLists, drawer
-    turns = int(params['Turns'])
-    diameter = float(params['Diameter'])
-    clearance = float(params['Width between traces'])
-    trace_width = float(params['Trace Width'])
-    layers = int(params['Layers'])
-    pcb_thickness = float(params['PCB Thickness'])
-    copper_thickness = float(params['Copper Thickness'])
-    shape = params['Shape']
-    formula = params['Formula']
-    loop_enabled = params.get('loop_enabled', False)
-    loop_diameter = float(params.get('loop_diameter', 0))
+    global coil, renderedLineLists, drawer, updated
+    coil = coilClass(
+        turns=int(params['Turns']),
+        diam=float(params['Diameter']),
+        clearance=float(params['Width between traces']),
+        traceWidth=float(params['Trace Width']),
+        layers=int(params['Layers']),
+        PCBthickness=float(params['PCB Thickness']),
+        copperThickness=float(params['Copper Thickness']),
+        shape=params['Shape'],
+        formula=params['Formula'],
+        loop_enabled=params.get('loop_enabled', False),
+        loop_diameter=float(params.get('loop_diameter', 0))
+    )
 
-    coil = coilClass(turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shapes[shape], formula, loop_enabled=loop_enabled, loop_diameter=loop_diameter)
-    print(f"Updated coil with parameters: {coil}")
-
-    renderedLineLists = [coil.renderAsCoordinateList(False)]
-    if loop_enabled:
-        renderedLineLists.append(coil.render_loop_antenna())
+    renderedLineLists = [coil.renderAsCoordinateList()]
+    if coil.loop_enabled:
+        loop_antenna_coords = coil.render_loop_antenna()
+        if not loop_antenna_coords:
+            print("Warning: Loop antenna coordinates are empty")
+        renderedLineLists.append(loop_antenna_coords)
     else:
-        renderedLineLists.append(coil.renderAsCoordinateList(True))
-    
+        renderedLineLists.append([])
+
     drawer.localVar = coil
     drawer.localVarUpdated = True
     drawer.debugText = drawer.makeDebugText(coil)
     drawer.lastFilename = coil.generateCoilFilename()
+    updated = True  # Set the update flag to true after updating the coil parameters
+      
+    
+
 
 def main():
     global coil, renderedLineLists, drawer
@@ -336,20 +353,23 @@ def main():
         drawer.windowHandler = windowHandler  # Assign the window handler
         update_coil_params(initial_params)
 
+        listUpdated = True  # Flag to track if the list has been updated
+
         while windowHandler.keepRunning:
             loopStart = time.time()
             drawer.renderBG()
-            drawer.drawLineList(renderedLineLists)
+            drawer.drawLineList(renderedLineLists)  # Always draw the coil
             drawer.renderFG()
             windowHandler.frameRefresh()
             UI.handleAllWindowEvents(drawer)
 
             if drawer.localVarUpdated:
                 drawer.localVarUpdated = False
+                listUpdated = True  # Set the flag when localVar is updated
 
             loopEnd = time.time()
-            if (loopEnd - loopStart) < (1 / (60 * 1.05)):
-                time.sleep((1 / 60) - (loopEnd - loopStart))
+            sleep_time = max(0, (1 / 60) - (loopEnd - loopStart))
+            time.sleep(sleep_time)
 
             root.update()
 
