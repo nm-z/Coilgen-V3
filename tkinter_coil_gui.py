@@ -10,7 +10,7 @@ class CoilParameterGUI:
         self.defaults = {
             "Turns": 9,
             "Diameter": 40,
-            "Clearance": 0.15,
+            "Width between traces": 0.15,
             "Trace Width": 0.9,
             "Layers": 2,
             "PCB Thickness": 0.6,
@@ -26,7 +26,7 @@ class CoilParameterGUI:
 
     def create_widgets(self):
         self.param_labels = [
-            "Turns", "Diameter", "Clearance", "Trace Width",
+            "Turns", "Diameter", "Width between traces", "Trace Width",
             "Layers", "PCB Thickness", "Copper Thickness",
             "Shape", "Formula"
         ]
