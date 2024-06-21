@@ -46,14 +46,49 @@ class CoilParameterGUI:
                 entry.insert(0, str(self.defaults[label]))
                 self.param_entries.append(entry)
 
+        # Add checkbox for loop antenna
+        self.loop_var = tk.BooleanVar()
+        self.loop_check = tk.Checkbutton(self.master, text="Enable Loop Antenna", variable=self.loop_var, command=self.update_loop_diameter)
+        self.loop_check.grid(row=len(self.param_labels), column=0, columnspan=2, sticky=tk.W)
+
+        # Add entry for loop antenna diameter
+        self.loop_diameter_label = tk.Label(self.master, text="Loop Antenna Diameter")
+        self.loop_diameter_entry = tk.Entry(self.master, state='disabled')
+        self.loop_diameter_label.grid(row=len(self.param_labels) + 1, column=0)
+        self.loop_diameter_entry.grid(row=len(self.param_labels) + 1, column=1)
+
         self.submit_button = tk.Button(self.master, text="Submit", command=self.submit)
-        self.submit_button.grid(row=len(self.param_labels), columnspan=2)
+        self.submit_button.grid(row=len(self.param_labels) + 2, columnspan=2)
+
+    def update_loop_diameter(self):
+        if self.loop_var.get():
+            main_coil_diameter = float(self.param_entries[1].get())
+            loop_diameter = main_coil_diameter / 2
+            self.loop_diameter_entry.config(state='normal')
+            self.loop_diameter_entry.delete(0, tk.END)
+            self.loop_diameter_entry.insert(0, str(loop_diameter))
+            self.loop_diameter_entry.config(state='disabled')
+        else:
+            self.loop_diameter_entry.config(state='normal')
+            self.loop_diameter_entry.delete(0, tk.END)
+            self.loop_diameter_entry.config(state='disabled')
 
     def submit(self):
-        self.params = [entry.get() for entry in self.param_entries]
+        self.params = {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
+        self.params['loop_enabled'] = self.loop_var.get()
+        self.params['loop_diameter'] = float(self.loop_diameter_entry.get()) if self.loop_var.get() else 0
         self.update_callback(self.params)
 
+    def get_params(self):
+        return {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
+
+
+# For testing purposes
 if __name__ == "__main__":
+    def print_params(params):
+        print(params)
+
     root = tk.Tk()
-    app = CoilParameterGUI(root, lambda x: print("Updated params:", x))
+    gui = CoilParameterGUI(root, print_params)
     root.mainloop()
+
