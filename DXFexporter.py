@@ -3,6 +3,8 @@ from datetime import datetime
 import numpy as np
 import math
 
+# ezdxf WORKING
+
 # Constants
 DXFoutputFormats = {'EasyEDA': 'EasyEDA', 'Altium': 'Altium'}
 magneticConstant = 4 * np.pi * 10**-7

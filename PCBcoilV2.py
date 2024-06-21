@@ -193,7 +193,7 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     return filename
 
 class coilClass:
-    def __init__(self, turns: int, diam: float, clearance: float, traceWidth: float, layers: int = 1, PCBthickness: float = 1.6, copperThickness: float = ozCopperToMM(1.0), shape: _shapeBaseClass = shapes['circle'], formula: str = 'cur_sheet', CCW: bool = False):
+    def __init__(self, turns: int, diam: float, clearance: float, traceWidth: float, layers: int = 1, PCBthickness: float = 1.6, copperThickness: float = ozCopperToMM(1.0), shape: _shapeBaseClass = shapes['circle'], formula: str = 'cur_sheet', CCW: bool = False, loop_enabled: bool = False, loop_diameter: float = 0.0):
         self.turns = turns
         self.diam = diam
         self.clearance = clearance
@@ -201,13 +201,15 @@ class coilClass:
         self.layers = max(layers, 1)
         self.PCBthickness = PCBthickness
         self.copperThickness = copperThickness
-        self.shape = (shape if issubclass(shape.__class__, _shapeBaseClass) else self.__init__.__defaults__[-2])
+        self.shape = (shape if issubclass(shape.__class__, _shapeBaseClass) else self.__init__.__defaults__[-3])
         if (self.shape.__class__ != shape.__class__):
             print("coilClass init() changing shape from:", shape, "to", self.shape, "because it's not a _shapeBaseClass subclass")
-        self.formula = (formula if (formula in self.shape.formulaCoefficients) else self.__init__.__defaults__[-1])
+        self.formula = (formula if (formula in self.shape.formulaCoefficients) else self.__init__.__defaults__[-2])
         if (self.formula != formula):
             print("coilClass init() changing formula from:", formula, "to", self.formula, "because it's not in the " + str(self.shape) + ".formulaCoefficients")
         self.CCW = CCW
+        self.loop_enabled = loop_enabled
+        self.loop_diameter = loop_diameter
 
     def calcCoilTraceLength(self):
         return self.shape.calcLength(self.turns * self.shape.stepsPerTurn, self.diam, self.clearance, self.traceWidth) * self.layers
@@ -251,26 +253,62 @@ class coilClass:
             angleRes = (angleResOverride if (angleResOverride is not None) else angleRenderResDefault)
             return [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
 
+    def render_loop_antenna(self):
+        loop_radius = self.loop_diameter / 2
+        points = []
+        steps = 100  # Number of points to draw the circle
+        for step in range(steps + 1):  # Include the last point to close the loop
+            angle = 2 * np.pi * step / steps
+            x = loop_radius * np.cos(angle)
+            y = loop_radius * np.sin(angle)
+            points.append((x, y))
+        return points
+
     def generateCoilFilename(self):
-        return generateCoilFilename(self)
+        return(generateCoilFilename(self))
+
+    def saveDXF(self) -> list[str]:
+        import DXFexporter as DXFexp
+        filenames: list[str] = []
+        for outputFormat in DXFexp.DXFoutputFormats:
+            filenames += DXFexp.saveDXF(self, outputFormat)
+        return(filenames)
+
+    def to_excel(self, filename:str = None) -> str:
+        """ produce an excel file with only 1 row of data; this coil """
+        import excelExporter as excExp
+        if(filename is None):  filename = self.generateCoilFilename() + excExp.fileExtension
+        excExp.exportCoils([self,], filename)
+
+    def imwrite(self, *arg) -> list[np.ndarray]:
+        """ just a macro that imports cv2exporter.py and runs .imwrite() with the provided arguments """
+        import cv2exporter as cv2exp
+        cv2exp.imwrite(self, *arg)
+
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer
-    turns, diameter, width_between_traces, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = params
-    turns = int(turns)
-    diameter = float(diameter)
-    clearance = float(width_between_traces)  # Updated variable name
-    trace_width = float(trace_width)
-    layers = int(layers)
-    pcb_thickness = float(pcb_thickness)
-    copper_thickness = float(copper_thickness)
-    shape = shapes[shape]
-    formula = formula
+    turns = int(params['Turns'])
+    diameter = float(params['Diameter'])
+    clearance = float(params['Width between traces'])
+    trace_width = float(params['Trace Width'])
+    layers = int(params['Layers'])
+    pcb_thickness = float(params['PCB Thickness'])
+    copper_thickness = float(params['Copper Thickness'])
+    shape = params['Shape']
+    formula = params['Formula']
+    loop_enabled = params.get('loop_enabled', False)
+    loop_diameter = float(params.get('loop_diameter', 0))
 
-    coil = coilClass(turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula)
+    coil = coilClass(turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shapes[shape], formula, loop_enabled=loop_enabled, loop_diameter=loop_diameter)
     print(f"Updated coil with parameters: {coil}")
 
-    renderedLineLists = [coil.renderAsCoordinateList(False), coil.renderAsCoordinateList(True)]
+    renderedLineLists = [coil.renderAsCoordinateList(False)]
+    if loop_enabled:
+        renderedLineLists.append(coil.render_loop_antenna())
+    else:
+        renderedLineLists.append(coil.renderAsCoordinateList(True))
+    
     drawer.localVar = coil
     drawer.localVarUpdated = True
     drawer.debugText = drawer.makeDebugText(coil)
@@ -283,9 +321,11 @@ def main():
     app = CoilParameterGUI(root, update_coil_params)
     root.after(0, root.deiconify)
     
-    initial_params = [
-        9, 40, 0.15, 0.9, 2, 0.6, 0.030, 'circle', 'cur_sheet'
-    ]
+    initial_params = {
+        "Turns": 9, "Diameter": 40, "Width between traces": 0.15, "Trace Width": 0.9, 
+        "Layers": 2, "PCB Thickness": 0.6, "Copper Thickness": 0.030, 
+        "Shape": 'circle', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0
+    }
 
     if visualization:
         import pygameRenderer as PR
@@ -293,6 +333,7 @@ def main():
 
         windowHandler = PR.pygameWindowHandler([1280, 720], "PCB coil generator", "fancy/icon.png")
         drawer = PR.pygameDrawer(windowHandler)
+        drawer.windowHandler = windowHandler  # Assign the window handler
         update_coil_params(initial_params)
 
         while windowHandler.keepRunning:
