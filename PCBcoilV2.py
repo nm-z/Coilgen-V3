@@ -1,3 +1,8 @@
+# TODO: Add Loop Antenna Option
+# TODO: 2 trace widths from the outermost trace. 2 fiducias, diagonally (1 Upper right hand corner and 1 Lower Left hand corner)
+# - Loop antenna option (1/2 size of sensor): Use second layer, default layer 2 to a single turn  at ½ the diameter of layer 1. Use layer 1 trace-width for now.
+
+
 from tkinter_coil_gui import CoilParameterGUI
 import tkinter as tk
 import numpy as np
@@ -251,10 +256,10 @@ class coilClass:
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer
-    turns, diameter, clearance, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = params
+    turns, diameter, width_between_traces, trace_width, layers, pcb_thickness, copper_thickness, shape, formula = params
     turns = int(turns)
     diameter = float(diameter)
-    clearance = float(clearance)
+    clearance = float(width_between_traces)  # Updated variable name
     trace_width = float(trace_width)
     layers = int(layers)
     pcb_thickness = float(pcb_thickness)
