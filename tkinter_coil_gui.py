@@ -62,22 +62,16 @@ class CoilParameterGUI:
 
     def update_loop_diameter(self):
         if self.loop_var.get():
-            main_coil_diameter = float(self.param_entries[1].get())
-            loop_diameter = main_coil_diameter / 2
             self.loop_diameter_entry.config(state='normal')
-            self.loop_diameter_entry.delete(0, tk.END)
-            self.loop_diameter_entry.insert(0, str(loop_diameter))
         else:
-            self.loop_diameter_entry.config(state='normal')
-            self.loop_diameter_entry.delete(0, tk.END)
             self.loop_diameter_entry.config(state='disabled')
 
     def submit(self):
         self.params = {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
         self.params['loop_enabled'] = self.loop_var.get()
-        self.params['loop_diameter'] = float(self.loop_diameter_entry.get()) if self.loop_var.get() else 0
+        # Ensure the loop diameter is converted to float and updated correctly
+        self.params['loop_diameter'] = float(self.loop_diameter_entry.get()) if self.loop_var.get() else 0.0
         self.update_callback(self.params)
-
     def get_params(self):
         return {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
 

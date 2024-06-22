@@ -258,23 +258,25 @@ class coilClass:
             return coordinates
         
     def render_loop_antenna(self):
-        loop_diameter = self.diam + 2 * self.traceWidth  # Increase diameter to move loop outside the main coil
-        x_offset = self.diam / 2 + loop_diameter / 2  # Calculate x offset to position loop beside the main coil
+        if not self.loop_enabled:
+            return []
 
-        loop_radius = loop_diameter / 2
+        # Calculate the true outer diameter of the main coil
+        true_outer_diam = self.calcTrueDiam() + 2 * self.traceWidth  # Includes all traces and clearances
+
+        # Calculate the offset to ensure a 5mm gap from the outer edge of the main coil
+        offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
+
+        loop_radius = self.loop_diameter / 2
         points = []
         steps = 100  # Number of points to draw the circle
-        for step in range(steps + 1):  # Include the last point to close the loop
+        for step in range(steps):
             angle = 2 * np.pi * step / steps
-            x = loop_radius * np.cos(angle) + x_offset  # Add offset to x-coordinate
+            x = loop_radius * np.cos(angle) + offset  # Add offset to x-coordinate
             y = loop_radius * np.sin(angle)
             points.append((x, y))
-        if len(points) == 0:  # Debug check
-            print("Error: No points generated for loop antenna")
-        return points  # Return as a flat list of points    
-    
-    
-    
+        points.append(points[0])  # Close the loop by appending the first point to the end
+        return points    
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
 
@@ -312,7 +314,6 @@ def update_coil_params(params):
         loop_enabled=params.get('loop_enabled', False),
         loop_diameter=float(params.get('loop_diameter', 0))
     )
-
     renderedLineLists = [coil.renderAsCoordinateList()]
     if coil.loop_enabled:
         loop_antenna_coords = coil.render_loop_antenna()
@@ -321,13 +322,11 @@ def update_coil_params(params):
         renderedLineLists.append(loop_antenna_coords)
     else:
         renderedLineLists.append([])
-
     drawer.localVar = coil
     drawer.localVarUpdated = True
     drawer.debugText = drawer.makeDebugText(coil)
     drawer.lastFilename = coil.generateCoilFilename()
-    updated = True  # Set the update flag to true after updating the coil parameters
-      
+    updated = True  # Set the update flag to true after updating the coil parameters      
     
 
 
@@ -340,8 +339,8 @@ def main():
     
     initial_params = {
         "Turns": 9, "Diameter": 40, "Width between traces": 0.15, "Trace Width": 0.9, 
-        "Layers": 2, "PCB Thickness": 0.6, "Copper Thickness": 0.030, 
-        "Shape": 'circle', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0
+        "Layers": 1, "PCB Thickness": 0.6, "Copper Thickness": 0.030, 
+        "Shape": 'square', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0
     }
 
     if visualization:
