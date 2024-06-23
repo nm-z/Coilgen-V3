@@ -482,10 +482,7 @@ class pygameDrawer():
                 continue  # Skip to the next layer
             if debug and layerItt % 2 == 0:  # Optionally reduce verbosity by printing every other layer
                 print(f"Drawing layer {currentLayer} with {len(lineList)} points")
-            for i in range(len(lineList) - 1):
-                startPos = self.realToPixelPos(lineList[i])
-                endPos = self.realToPixelPos(lineList[i + 1])
-                pygame.draw.line(self.windowHandler.window, currentLayerColor, startPos, endPos, lineWidthPixels)
+            self.drawSharpCorners(lineList, currentLayerColor, lineWidthPixels)
 
         # Check if loop antenna is enabled and draw it
         if coilToDraw.loop_enabled and len(lineLists) > coilToDraw.layers:
@@ -493,13 +490,24 @@ class pygameDrawer():
             loop_color = (255, 0, 0)  # Color for the loop antenna, e.g., red
             if debug and len(loop_antenna_coords) > 0:
                 print(f"Drawing loop antenna with {len(loop_antenna_coords)} points")
-            for i in range(len(loop_antenna_coords) - 1):
-                startPos = self.realToPixelPos(loop_antenna_coords[i])
-                endPos = self.realToPixelPos(loop_antenna_coords[i + 1])
-                pygame.draw.line(self.windowHandler.window, loop_color, startPos, endPos, lineWidthPixels)
+            self.drawSharpCorners(loop_antenna_coords, loop_color, lineWidthPixels)
 
         # Clear the update flag after drawing
         self.localVarUpdated = False
+
+    def drawSharpCorners(self, lineList, currentLayerColor, lineWidthPixels):
+        for i in range(len(lineList) - 1):
+            startPos = self.realToPixelPos(lineList[i])
+            endPos = self.realToPixelPos(lineList[i + 1])
+            if i < len(lineList) - 2:  # Check if not the last line segment
+                nextPos = self.realToPixelPos(lineList[i + 2])
+                endPos = self.calculateIntersection(startPos, endPos, nextPos, lineWidthPixels)
+            pygame.draw.line(self.windowHandler.window, currentLayerColor, startPos, endPos, lineWidthPixels)
+
+    def calculateIntersection(self, startPos, endPos, nextPos, lineWidth):
+        # Implement geometric calculation to adjust endPos so that it meets nextPos sharply
+        # This is a placeholder for the actual intersection calculation
+        return endPos  # This should be replaced with the actual calculated intersection point
 
     def renderBG(self, drawSpeedTimers: list = None):
         self._updateViewOffset() #handle mouse dragging
