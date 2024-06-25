@@ -9,7 +9,7 @@ import numpy as np
 import time
 import math  # Import the math module to use its functions
 from typing import Callable
-from numpy import linspace, pi, cos, sin, atan2  # Import additional functions for rounded corners
+from numpy import linspace, pi, cos, sin, arctan2  # Import additional functions for rounded corners
 
 visualization = True  # if you don't have pygame, you can still use the math
 saveToFile = True  # if visualization == False! (if True, then just use 's' key)
