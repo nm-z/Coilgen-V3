@@ -15,10 +15,12 @@ def generate_svg(coil, line_list, output_directory, offset=(150, 100)):
 
     def add_track(board, start, end, traceWidth):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
             track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((start[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((end[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             board.Add(track)
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
@@ -77,10 +79,12 @@ def generate_gerber(coil, line_list, output_directory, offset=(150, 100)):
 
     def add_track(board, start, end, traceWidth):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
             track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((start[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((end[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             board.Add(track)
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
@@ -135,10 +139,12 @@ def generate_dxf(coil, line_list, output_directory, offset=(150, 100)):
 
     def add_track(board, start, end, traceWidth):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
             track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((start[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((end[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             board.Add(track)
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
@@ -197,10 +203,12 @@ def generate_drill(coil, line_list, output_directory, offset=(150, 100)):
 
     def add_track(board, start, end, traceWidth):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
             track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((start[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((end[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             board.Add(track)
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
