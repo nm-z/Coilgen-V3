@@ -1,15 +1,14 @@
 # TODO: Add Loop Antenna Option
 # TODO: 2 trace widths from the outermost trace. 2 fiducias, diagonally (1 Upper right hand corner and 1 Lower Left hand corner)
 # - Loop antenna option (1/2 size of sensor): Use second layer, default layer 2 to a single turn  at ½ the diameter of layer 1. Use layer 1 trace-width for now.
-
-
-from tkinter_coil_gui import CoilParameterGUI
+# All imports are correctly placed at the top
 import tkinter as tk
 import numpy as np
 import time
 import math  # Import the math module to use its functions
 from typing import Callable
 from numpy import linspace, pi, cos, sin, arctan2  # Import additional functions for rounded corners
+
 
 visualization = True  # if you don't have pygame, you can still use the math
 saveToFile = True  # if visualization == False! (if True, then just use 's' key)
@@ -29,84 +28,103 @@ RhoCopper = 1.72 * 10**-8  # Ohms * meter
 distUnitMult = 1/1000  # convert mm to meters
 
 class _shapeBaseClass:
+    """ (static class) base class for defining a shape (and it's associated math) """
     formulaCoefficients: dict[str, tuple[float]]
-    stepsPerTurn: int | float
-    isDiscrete: bool = True
-
+    stepsPerTurn: int | float # discrete shapes use an int (number of corners), continuous shapes (circularSpiral) uses a float (angle in radians)
     @staticmethod
-    def calcPos(itt: int | float, diam: float, clearance: float, traceWidth: float, CCW: bool) -> tuple[float, float]: ...
+    def calcPos(itt:int|float,diam:float,clearance:float,traceWidth:float,CCW:bool)->tuple[float, float]:  ... # the modern python way of type-hinting an undefined function
     @staticmethod
-    def calcLength(itt: int | float, diam: float, clearance: float, traceWidth: float) -> float: ...
+    def calcLength(itt:int|float,diam:float,clearance:float,traceWidth:float)->float:  ...
+    isDiscrete: bool = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
+    def __repr__(self): # prints the name of the shape
+        return("shape("+(self.__class__.__name__)+")")
 
-    def __repr__(self):
-        return "shape(" + self.__class__.__name__ + ")"
-
+# Ensure all calcPos methods return tuples
 class squareSpiral(_shapeBaseClass):
-    formulaCoefficients = {
-        'wheeler': (2.34, 2.75),
-        'monomial': (1.62, -1.21, -0.147, 2.40, 1.78, -0.030),
-        'cur_sheet': (1.27, 2.07, 0.18, 0.13)
-    }
-    stepsPerTurn: int = 4
-
+    """ (static class) class to hold parameters and functions for square shaped coils """
+    formulaCoefficients = {'wheeler' : (2.34, 2.75),
+                            'monomial' : (1.62, -1.21, -0.147, 2.40, 1.78, -0.030),
+                            'cur_sheet' : (1.27, 2.07, 0.18, 0.13)}
+    stepsPerTurn: int = 4 # multiply with number of turns to get 'itt' for functions below
     @staticmethod
     def calcPos(itt: int, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
+        """ input is the number of steps (corners), 4 steps would be a full circle, generally: itt=(stepsPerTurn*turns)
+            output is a 2D coordinate along the spiral, starting outwards """
         spacing = calcTraceSpacing(clearance, traceWidth)
-        x = (1 if (((itt % 4) >= 2) ^ CCW) else -1) * (((diam - traceWidth) / 2) - ((itt // 4) * spacing))
-        y = (1 if (((itt % 4) == 1) or ((itt % 4) == 2)) else -1) * (((diam - traceWidth) / 2) - (((itt - 1) // 4) * spacing))
-        return (x, y)
-
+        x =      (1 if (((itt%4)>=2) ^ CCW) else -1)      * (((diam-traceWidth)/2) - ((itt//4)     * spacing))
+        y = (1 if (((itt%4)==1) or ((itt%4)==2)) else -1) * (((diam-traceWidth)/2) - (((itt-1)//4) * spacing))
+        return(x,y)
     @staticmethod
     def calcLength(itt: int, diam: float, clearance: float, traceWidth: float) -> float:
+        """ returns the length of the spiral at a given itt (without iterating, direct calculation) """
+        ## NOTE: if the spiral goes beyond the center point and grows larger again (it shouldn't), then the length will be negative). I'm intentionally not fixing that, becuase it makes for good debug info
         spacing = calcTraceSpacing(clearance, traceWidth)
-        horLines = (itt // 2)
-        sumOfWidths = (horLines * (diam - traceWidth)) - ((((horLines - 1) * horLines) / 2) * spacing)
-        vertLines = ((itt + 1) // 2)
-        sumOfHeights = (vertLines * (diam - traceWidth)) - ((max(((vertLines - 2) * (vertLines - 1)) / 2, 0) - 1) * spacing)
-        return (sumOfWidths + sumOfHeights)
+        horLines = (itt//2)
+        sumOfWidths = (horLines * (diam-traceWidth)) - ((((horLines-1)*horLines) / 2) * spacing) # length of all hor. lines = (horLines * diam) - triangular number of (horLines-1)
+        vertLines = ((itt+1)//2)
+        sumOfHeights = (vertLines * (diam-traceWidth)) - ((max(((vertLines-2)*(vertLines-1)) / 2, 0) - 1) * spacing) # length of all vert. lines
+        return(sumOfWidths + sumOfHeights)
+        ## paper[3] mentioned the formula: 4*turns*diam - 4*turns*tracewidth - (2*turns+1)^2 * (spacing)   but, please review their definitions of outer diameter and spacing before using this!
 
 class circularSpiral(_shapeBaseClass):
-    formulaCoefficients = {'wheeler': (2.23, 3.45), 'cur_sheet': (1.00, 2.46, 0.00, 0.20)}
-    stepsPerTurn: float = 2 * np.pi
-    isDiscrete = False
-
+    """ (static class) class to hold parameters and functions for circularly shaped coils """
+    formulaCoefficients = {'wheeler' : (2.23, 3.45),
+                            # the monomial formula does cover circular spirals
+                            'cur_sheet' : (1.00, 2.46, 0.00, 0.20)}
+    stepsPerTurn: float = 2*np.pi # multiply with number of turns to get 'angle' for functions below
+    isDiscrete = False # let the renderer know that this shape needs a resolution parameter
     @staticmethod
     def calcPos(angle: float, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
+        """ input is an angle in radians, 2pi would be a full circle, generally: angle=(stepsPerTurn*turns)
+            output is a 2D coordinate along the spiral, starting outwards """
         spacing = calcTraceSpacing(clearance, traceWidth)
-        x = (1 if CCW else -1) * np.sin(angle) * (((diam - traceWidth) / 2) - ((angle / (2 * np.pi)) * spacing))
-        y = -1 * np.cos(angle) * (((diam - traceWidth) / 2) - ((angle / (2 * np.pi)) * spacing))
-        return (x, y)
-
+        phaseShift = 0.0 # note: i have already phase-shifted (and inverted) the conventional cirlce by 90deg by using sin() for x and cos() for y (normally you would do it the other way around)
+        x = (1 if CCW else -1) * np.sin(angle) * (((diam-traceWidth)/2) - ((angle/(2*np.pi)) * spacing))
+        y =         -1         * np.cos(angle) * (((diam-traceWidth)/2) - ((angle/(2*np.pi)) * spacing))
+        return(x,y)
     @staticmethod
     def calcLength(angle: float, diam: float, clearance: float, traceWidth: float) -> float:
-        turns = (angle / circularSpiral.stepsPerTurn)
-        return (np.pi * turns * (diam + calcSimpleInnerDiam(turns, diam, clearance, traceWidth, circularSpiral())) / 2)
+        """ returns the length of the spiral at a given angle (without iterating, direct calculation) """
+        turns = (angle/circularSpiral.stepsPerTurn) # (float)
+        return(np.pi * turns * (diam + calcSimpleInnerDiam(turns, diam, clearance, traceWidth, circularSpiral())) / 2) # pi * turns * (diam + innerDiam) / 2 = basically just the circumference of the average diameter (outer+inner)/2
 
-class NthDimSpiral(_shapeBaseClass):
+class NthDimSpiral(_shapeBaseClass): # a general class for Nth dimensional polygon spirals. Specify the number of points/corners/sides (6 for hexagon, 8 for octagon, etc.) and provide formulaCoefficients in the subclass
+    """ (static class) a base class for Nth dimensional polygon spirals.
+        Specify the number of points/corners/sides as .stepsPerTurn (6 for hexagon, 8 for octagon, etc.) and provide .formulaCoefficients in the subclass """
     @classmethod
-    def circumDiam(subclass, inscribedDiam: float) -> float:
-        return (inscribedDiam / np.cos(np.deg2rad(180 / subclass.stepsPerTurn)))
-
-    @classmethod
+    def circumDiam(subclass, inscribedDiam: float) -> float:  return(inscribedDiam / np.cos(np.deg2rad(180/subclass.stepsPerTurn))) # just a macro for calculating the diameter of a circumscribed circle (spiral diam is inscribed)
+    @classmethod # class methods let you use subclass static variables
     def calcPos(subclass, itt: int, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
+        """ input is the number of steps (corners), 'stepsPerTurn' steps would be a full circle, generally: itt=(stepsPerTurn*turns)
+            output is a 2D coordinate along the spiral, starting outwards """
+        ## the easiest way is just to consider it as a circularSpiral, sampled at 6 points per rotation, with the diameter and spacing of a a circumscribed circle (sothat the inscribed circle has the desired diam)
+        # return(circularSpiral.calcPos(itt*np.deg2rad(360/subclass.stepsPerTurn), subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), CCW))
+        ## but i wish to have custom phase-shift based on the number of corners (to orient it straight)
         spacing = calcTraceSpacing(subclass.circumDiam(clearance), subclass.circumDiam(traceWidth))
-        angle = itt * np.deg2rad(360 / subclass.stepsPerTurn)
-        circumscribedDiam = subclass.circumDiam(diam - traceWidth)
-        phaseShift = ((np.deg2rad(180 / subclass.stepsPerTurn) * (-1 if CCW else 1)) if rotateNthDimSpirals else 0.0)
-        x = (1 if CCW else -1) * np.sin(angle + phaseShift) * ((circumscribedDiam / 2) - ((angle / (2 * np.pi)) * spacing))
-        y = -1 * np.cos(angle + phaseShift) * ((circumscribedDiam / 2) - ((angle / (2 * np.pi)) * spacing))
-        return (x, y)
-
+        angle = itt*np.deg2rad(360/subclass.stepsPerTurn)
+        circumscribedDiam = subclass.circumDiam(diam-traceWidth)
+        phaseShift = ((np.deg2rad(180/subclass.stepsPerTurn)*(-1 if CCW else 1)) if rotateNthDimSpirals else 0.0)
+        x = (1 if CCW else -1) * np.sin(angle+phaseShift) * ((circumscribedDiam/2) - ((angle/(2*np.pi)) * spacing))
+        y =         -1         * np.cos(angle+phaseShift) * ((circumscribedDiam/2) - ((angle/(2*np.pi)) * spacing))
+        return(x,y)
     @classmethod
     def calcLength(subclass, itt: int, diam: float, clearance: float, traceWidth: float) -> float:
-        return (itt * np.sin(np.deg2rad(180 / subclass.stepsPerTurn)) * (subclass.circumDiam(diam) + calcSimpleInnerDiam(itt / subclass.stepsPerTurn, subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), NthDimSpiral())) / 2)
+        """ returns the length of the spiral at a given itt (without iterating, direct calculation) """
+        return(itt * np.sin(np.deg2rad(180/subclass.stepsPerTurn)) * (subclass.circumDiam(diam) + calcSimpleInnerDiam(itt/subclass.stepsPerTurn, subclass.circumDiam(diam), subclass.circumDiam(clearance), subclass.circumDiam(traceWidth), NthDimSpiral())) / 2)
+        ## similar to the circularSpiral, the perimiter (circumference) of an NthDimSpiral can be seem as the perimiter of the average polygon. Then just simplify the equations after inserting itt (calculating turn variable is a little extra)
 
 class hexagonSpiral(NthDimSpiral):
-    formulaCoefficients = {'wheeler': (2.33, 3.82), 'monomial': (1.28, -1.24, -0.174, 2.47, 1.77, -0.049), 'cur_sheet': (1.09, 2.23, 0.00, 0.17)}
+    """ (static class) class to hold parameters and functions for hexagonally-shaped (sortof, the angles are not actually 60deg) coils """
+    formulaCoefficients = {'wheeler' : (2.33, 3.82),
+                            'monomial' : (1.28, -1.24, -0.174, 2.47, 1.77, -0.049),
+                            'cur_sheet' : (1.09, 2.23, 0.00, 0.17)}
     stepsPerTurn: int = 6
 
 class octagonSpiral(NthDimSpiral):
-    formulaCoefficients = {'wheeler': (2.25, 3.55), 'monomial': (1.33, -1.21, -0.163, 2.43, 1.75, -0.049), 'cur_sheet': (1.07, 2.29, 0.00, 0.19)}
+    """ (static class) class to hold parameters and functions for octagonally-shaped (sortof, the angles are not actually 45deg) coils """
+    formulaCoefficients = {'wheeler' : (2.25, 3.55),
+                            'monomial' : (1.33, -1.21, -0.163, 2.43, 1.75, -0.049),
+                            'cur_sheet' : (1.07, 2.29, 0.00, 0.19)}
     stepsPerTurn: int = 8
 
 shapes = {'square': squareSpiral(), 'hexagon': hexagonSpiral(), 'octagon': octagonSpiral(), 'circle': circularSpiral()}
@@ -250,19 +268,25 @@ class coilClass:
         return self.calcInductanceSingleLayer() if (self.layers == 1) else calcInductanceMultilayer(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, self.calcLayerSpacing(), self.shape, self.formula)
 
     def renderAsCoordinateList(self, reverseDirection=False, angleResOverride: float = None):
+        coordinates = []
         if self.shape.isDiscrete:
             if angleResOverride is not None:
                 print("renderAsCoordinateList() ignoring angleResOverride, shape not circular")
             coordinates = [self.shape.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
             if len(coordinates) % 10 == 0:  # Example condition: print only if the number of coordinates is a multiple of 10
                 print(f"renderAsCoordinateList (Discrete): {len(coordinates)} points")
-            return coordinates
         else:
             angleRes = angleResOverride if angleResOverride else angleRenderResDefault
             coordinates = [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
             if len(coordinates) % 10 == 0:  # Same example condition
                 print(f"renderAsCoordinateList (Continuous): {len(coordinates)} points")
-            return coordinates
+
+        # Convert list of points to list of line segments
+        line_segments = []
+        for i in range(len(coordinates) - 1):
+            line_segments.append((coordinates[i], coordinates[i + 1]))
+
+        return line_segments
 
     def render_loop_antenna(self):
         if not self.loop_enabled:
@@ -275,7 +299,7 @@ class coilClass:
             print(f"Error: Shape {self.loop_shape} not recognized.")
             return []
         
-        shape_instance = shapes[self.loop_shape]
+        shape_instance = shapes[self.loop_shape]        
         points = []
         true_outer_diam = self.calcTrueDiam()  
         # Adjusting the offset to move the loop next to the coil
@@ -311,7 +335,6 @@ class coilClass:
             print(f"Shape type {type(shape_instance)} not handled.")
         
         return points
-
 
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
@@ -367,7 +390,20 @@ def update_coil_params(params):
     
 
 
+# Helper function to flatten nested tuples
+def flatten_and_convert_to_floats(point):
+    if isinstance(point, (list, tuple)) and len(point) == 2:
+        # Check if the elements within the point are also tuples
+        if isinstance(point[0], (list, tuple)):
+            point = (point[0][0], point[0][1])
+        elif isinstance(point[1], (list, tuple)):
+            point = (point[1][0], point[1][1])
+        return (float(point[0]), float(point[1]))
+    else:
+        raise ValueError(f"Invalid point format: {point}")
+
 def main():
+    from tkinter_coil_gui import CoilParameterGUI
     global coil, renderedLineLists, drawer
 
     root = tk.Tk()
@@ -394,7 +430,19 @@ def main():
         while windowHandler.keepRunning:
             loopStart = time.time()
             drawer.renderBG()
-            drawer.drawLineList(renderedLineLists)  # Always draw the coil
+
+            # Ensure the elements in renderedLineLists are tuples of tuples containing floats
+            formattedLineLists = []
+            for line in renderedLineLists:
+                formattedLine = []
+                for point in line:
+                    try:
+                        formattedLine.append(flatten_and_convert_to_floats(point))
+                    except ValueError as e:
+                        print(e)
+                formattedLineLists.append(tuple(formattedLine))
+
+            drawer.drawLineList(formattedLineLists)  # Always draw the coil
             drawer.renderFG()
             windowHandler.frameRefresh()
             UI.handleAllWindowEvents(drawer)

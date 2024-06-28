@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/nate/.cursor-tutor/PCBcoilGenerator/coilgen"
+set -gx VIRTUAL_ENV "/home/nate/PCBcoilGenerator/coilgen"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
