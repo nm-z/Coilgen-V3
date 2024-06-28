@@ -218,7 +218,7 @@ def generate_drill(coil, line_list, output_directory, offset=(150, 100)):
     # Generate the drill files
     drl_writer = pcbnew.EXCELLON_WRITER(board)
     drl_writer.SetMapFileFormat(pcbnew.PLOT_FORMAT_PDF)
-    drl_writer.SetOptions(False, False, pcbnew.wxPoint(0, 0), False)
+    drl_writer.SetOptions(False, False, pcbnew.VECTOR2I(0, 0), False)
     drl_writer.SetFormat(True)
     drl_writer.CreateDrillandMapFilesSet(output_directory, True, False)
 
