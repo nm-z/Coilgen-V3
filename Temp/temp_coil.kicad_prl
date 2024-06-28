@@ -74,7 +74,7 @@
     "ssh_key": ""
   },
   "meta": {
-    "filename": "coil.kicad_prl",
+    "filename": "temp_coil.kicad_prl",
     "version": 3
   },
   "project": {
