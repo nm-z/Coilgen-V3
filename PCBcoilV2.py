@@ -304,7 +304,7 @@ class coilClass:
         true_outer_diam = self.calcTrueDiam()  
         # Adjusting the offset to move the loop next to the coil
         x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
-        y_offset = (true_outer_diam / 2)  - 20 # KEEP THIS, it sets the y_offset to the middle of the coil
+        y_offset = (true_outer_diam / 2)  - 20  # KEEP THIS, it sets the y_offset to the middle of the coil
         loop_radius = self.loop_diameter / 2
         adjusted_radius = loop_radius - (self.traceWidth / 2)  # Adjust radius to account for trace width
         
@@ -327,12 +327,9 @@ class coilClass:
             # Increase the resolution by using a smaller step size for angle increment
             step_size = 0.01  # smaller step size for higher resolution
             points = [(adjusted_radius * np.cos(2 * np.pi * step * step_size) + x_offset, adjusted_radius * np.sin(2 * np.pi * step * step_size) + y_offset) for step in range(int(1/step_size) + 1)]
-        elif self.loop_shape == 'hexagonalSpiral':
-            num_sides = 6
-            angle_increment = 360 / num_sides
-            points = [(x_offset + adjusted_radius * np.cos(math.radians(i * angle_increment)), y_offset + adjusted_radius * np.sin(math.radians(i * angle_increment))) for i in range(num_sides + 1)]
         else:
             print(f"Shape type {type(shape_instance)} not handled.")
+        
         
         return points
 
