@@ -386,7 +386,8 @@ def update_coil_params(params):
     drawer.localVarUpdated = True
     drawer.debugText = drawer.makeDebugText(coil)
     drawer.lastFilename = coil.generateCoilFilename()
-    updated = True  # Set the update flag to true after updating the coil parameters      
+    updated = True  # Set the update flag to true after updating the coil parameters    
+    return coil  # Ensure the coil object is returned
     
 
 
