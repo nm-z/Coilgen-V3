@@ -1,8 +1,14 @@
+import sys
+sys.path.append(r'C:\Program Files\KiCad\8.0\bin\Lib\site-packages')
 import os
+os.add_dll_directory(r'C:\Program Files\KiCad\8.0\bin')  # Add this line
 import pcbnew
 import tkinter as tk
 from tkinter import filedialog
 from PCBcoilV2 import coilClass
+
+import os
+
 
 # Get the path to the Temp directory within the project folder
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
