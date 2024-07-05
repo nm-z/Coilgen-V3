@@ -1,7 +1,14 @@
 import sys
-sys.path.append(r'C:\Program Files\KiCad\8.0\bin\Lib\site-packages')
 import os
-os.add_dll_directory(r'C:\Program Files\KiCad\8.0\bin')  # Add this line
+
+# Adjust the path for packaged environment
+if getattr(sys, 'frozen', False):
+    kicad_bin_path = os.path.join(sys._MEIPASS, 'KiCad/bin')
+else:
+    kicad_bin_path = r'C:\Users\natez\PCBcoilGenerator\pcbnew\bin'
+
+sys.path.append(os.path.join(kicad_bin_path, 'Lib/site-packages'))
+os.add_dll_directory(kicad_bin_path)
 import pcbnew
 import tkinter as tk
 from tkinter import filedialog
