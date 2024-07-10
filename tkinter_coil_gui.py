@@ -127,8 +127,7 @@ class CoilParameterGUI:
         self.export_options = {
             'SVG': tk.BooleanVar(value=True),
             'Gerber': tk.BooleanVar(value=True),
-            'DXF': tk.BooleanVar(value=True),
-            'Drill': tk.BooleanVar(value=False)
+            'DXF': tk.BooleanVar(value=True)
         }
 
         for idx, (option, var) in enumerate(self.export_options.items()):
