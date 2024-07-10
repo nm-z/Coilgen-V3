@@ -19,7 +19,7 @@ if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
 def generateCoilFilename(coil):
-    return f"d{coil.outerDiameter:.1f}_t{coil.traceWidth:.2f}_s{coil.traceSpacing:.2f}"
+    return coil.generateCoilFilename()
 
 def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
     # Initialize the board
@@ -67,20 +67,26 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Plot the appropriate layer
+    # Generate unique filenames for coil and loop
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+
+    # Plot the F.Cu (Front Copper) layer
+    if coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(coil_filename, pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
+        plot_controller.PlotLayer()
+
+    # Plot the B.Cu (Back Copper) layer if loop antenna exists
     if loop_line_list:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile("Loop", pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
-        plot_controller.PlotLayer()
-    elif coil_line_list:
-        plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
+        plot_controller.OpenPlotfile(loop_filename, pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
         plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"SVG file generated in {output_directory}")
+    print(f"SVG file(s) generated in {output_directory}")
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -136,19 +142,25 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Plot the appropriate layer
+    # Generate unique filenames for coil and loop
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+
+    # Plot the F.Cu (Front Copper) layer to Gerber
+    if coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(f"{coil_filename}_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Coil Front Copper Layer")
+        plot_controller.PlotLayer()
+
+    # Plot the B.Cu (Back Copper) layer to Gerber if loop antenna exists
     if loop_line_list:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile("Loop_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
-        plot_controller.PlotLayer()
-    elif coil_line_list:
-        plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile("coil_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Coil Front Copper Layer")
+        plot_controller.OpenPlotfile(f"{loop_filename}_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
         plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
-    print(f"Gerber file generated in {output_directory}")
+    print(f"Gerber file(s) generated in {output_directory}")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -207,20 +219,26 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Set up the DXF plot
     plot_options.SetFormat(pcbnew.PLOT_FORMAT_DXF)
 
-    # Plot the appropriate layer
+    # Generate unique filenames for coil and loop
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+
+    # Plot the F.Cu (Front Copper) layer
+    if coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(coil_filename, pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
+        plot_controller.PlotLayer()
+
+    # Plot the B.Cu (Back Copper) layer if loop antenna exists
     if loop_line_list:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile("Loop", pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
-        plot_controller.PlotLayer()
-    elif coil_line_list:
-        plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
+        plot_controller.OpenPlotfile(loop_filename, pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
         plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"DXF file generated in {output_directory}")
+    print(f"DXF file(s) generated in {output_directory}")
 
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -268,8 +286,8 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
     excellon_writer.SetFormat(True)
 
     # Generate unique filenames for coil and loop drill files
-    coil_filename = f"coil_{generateCoilFilename(coil)}"
-    loop_filename = f"loop_{generateCoilFilename(coil)}"
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
 
     # Generate drill files
     if coil_line_list:
@@ -299,8 +317,9 @@ def export_coil(coil, coil_line_list, export_options):
                 initialize_gerber_generation(coil, coil_line_list, [])
             elif option == 'DXF':
                 initialize_dxf_generation(coil, coil_line_list, [])
-            elif option == 'Drill':
-                initialize_drill_generation(coil, coil_line_list, [])
+            # Drill file generation is commented out
+            # elif option == 'Drill':
+            #     initialize_drill_generation(coil, coil_line_list, [])
 
 def export_loop(coil, loop_line_list, export_options):
     for option, var in export_options.items():
@@ -311,8 +330,6 @@ def export_loop(coil, loop_line_list, export_options):
                 initialize_gerber_generation(coil, [], loop_line_list)
             elif option == 'DXF':
                 initialize_dxf_generation(coil, [], loop_line_list)
-            elif option == 'Drill':
-                initialize_drill_generation(coil, [], loop_line_list)
-
-    # Debug print
-    print(f"Loop line list: {loop_line_list}")
+            # Drill file generation is commented out
+            # elif option == 'Drill':
+            #     initialize_drill_generation(coil, [], loop_line_list)

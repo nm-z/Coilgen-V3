@@ -169,11 +169,4 @@ class CoilParameterGUI:
         self.submit()
         coil = self.update_callback(self.params)
         loop_line_list = coil.render_loop_antenna()
-        
-        # Debug print
-        print(f"Loop enabled: {self.loop_enabled.get()}")
-        print(f"Loop diameter: {self.params['loop_diameter']}")
-        print(f"Loop shape: {self.params['loop_shape']}")
-        print(f"Loop line list: {loop_line_list}")
-        
         pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options)

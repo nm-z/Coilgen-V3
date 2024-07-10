@@ -199,19 +199,18 @@ def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWid
     return totalInduct
 
 def generateCoilFilename(coil: 'coilClass') -> str:
-    filename = coil.shape.__class__.__name__[0:2]
-    filename += '_di' + str(int(round(coil.diam, 0)))
-    filename += '_tu' + str(coil.turns)
-    filename += '_wi' + str(int(round(coil.traceWidth * 1000, 0)))
-    filename += '_cl' + str(int(round(coil.clearance * 1000, 0)))
-    filename += '_cT' + str(int(round(coil.copperThickness * 1000, 0)))
-    if (coil.layers > 1):
-        filename += '_La' + str(coil.layers)
-        filename += '_Pt' + str(int(round(coil.PCBthickness * 1000, 0)))
-    filename += '_Re' + str(int(round(coil.calcTotalResistance() * 1000, 0)))
-    filename += '_In' + str(int(round(coil.calcInductance() * 1000000000, 0)))
+    filename = coil.shape.__class__.__name__[0:2].upper()
+    filename += f'_di{int(coil.diam)}'
+    filename += f'_tu{coil.turns}'
+    filename += f'_wi{int(coil.traceWidth * 1000)}'
+    filename += f'_cl{int(coil.clearance * 1000)}'
+    filename += f'_cT{int(coil.copperThickness * 1000)}'
+    if coil.layers > 1:
+        filename += f'_La{coil.layers}'
+        filename += f'_Pt{int(coil.PCBthickness * 1000)}'
+    filename += f'_Re{int(coil.calcTotalResistance() * 1000)}'
+    filename += f'_In{int(coil.calcInductance() * 1000000)}'
     return filename
-# param
 
 class coilClass:
     def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0, loop_shape='circle'):
