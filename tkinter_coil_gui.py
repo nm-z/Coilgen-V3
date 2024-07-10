@@ -1,6 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 import pcbnew_exporter
+
 
 class CoilParameterGUI:
     def __init__(self, master, update_callback):
@@ -161,17 +162,20 @@ class CoilParameterGUI:
         coil_line_list = coil.renderAsCoordinateList()
         loop_line_list = coil.render_loop_antenna() if self.loop_enabled.get() else []
         
+        output_directory = filedialog.askdirectory(title="Select Output Directory")
+        if not output_directory:
+            return
+
         for option, var in self.export_options.items():
             if var.get():
                 if option == 'SVG':
-                    pcbnew_exporter.generate_svg(coil, coil_line_list, loop_line_list, self.output_directory)
+                    pcbnew_exporter.generate_svg(coil, coil_line_list, loop_line_list, output_directory)
                 elif option == 'Gerber':
-                    pcbnew_exporter.generate_gerber(coil, coil_line_list, loop_line_list, self.output_directory)
+                    pcbnew_exporter.generate_gerber(coil, coil_line_list, loop_line_list, output_directory)
                 elif option == 'DXF':
-                    pcbnew_exporter.generate_dxf(coil, coil_line_list, loop_line_list, self.output_directory)
+                    pcbnew_exporter.generate_dxf(coil, coil_line_list, loop_line_list, output_directory)
                 elif option == 'Drill':
-                    pcbnew_exporter.generate_drill(coil, coil_line_list, loop_line_list, self.output_directory)
-
+                    pcbnew_exporter.generate_drill(coil, coil_line_list, loop_line_list, output_directory)
 
     def export_coil(self):
         self.submit()
