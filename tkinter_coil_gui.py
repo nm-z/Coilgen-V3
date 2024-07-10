@@ -134,14 +134,11 @@ class CoilParameterGUI:
         for idx, (option, var) in enumerate(self.export_options.items()):
             tk.Checkbutton(self.export_frame, text=option, variable=var).grid(row=idx, column=0, sticky='w')
 
-        self.export_all_button = tk.Button(self.export_frame, text="Export All", command=self.export_all)
-        self.export_all_button.grid(row=len(self.export_options), column=0, columnspan=2, pady=10)
-
         self.export_coil_button = tk.Button(self.export_frame, text="Export Coil", command=self.export_coil)
-        self.export_coil_button.grid(row=len(self.export_options)+1, column=0, pady=5)
+        self.export_coil_button.grid(row=len(self.export_options), column=0, pady=5)
 
         self.export_loop_button = tk.Button(self.export_frame, text="Export Loop", command=self.export_loop)
-        self.export_loop_button.grid(row=len(self.export_options)+1, column=1, pady=5)
+        self.export_loop_button.grid(row=len(self.export_options), column=1, pady=5)
 
     def submit(self):
         self.params = {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
@@ -155,27 +152,6 @@ class CoilParameterGUI:
         self.params['Formula'] = 'cur_sheet'  # Default value
         coil = self.update_callback(self.params)
         return coil
-
-    def export_all(self):
-        self.submit()
-        coil = self.update_callback(self.params)
-        coil_line_list = coil.renderAsCoordinateList()
-        loop_line_list = coil.render_loop_antenna() if self.loop_enabled.get() else []
-        
-        output_directory = filedialog.askdirectory(title="Select Output Directory")
-        if not output_directory:
-            return
-
-        for option, var in self.export_options.items():
-            if var.get():
-                if option == 'SVG':
-                    pcbnew_exporter.generate_svg(coil, coil_line_list, loop_line_list, output_directory)
-                elif option == 'Gerber':
-                    pcbnew_exporter.generate_gerber(coil, coil_line_list, loop_line_list, output_directory)
-                elif option == 'DXF':
-                    pcbnew_exporter.generate_dxf(coil, coil_line_list, loop_line_list, output_directory)
-                elif option == 'Drill':
-                    pcbnew_exporter.generate_drill(coil, coil_line_list, loop_line_list, output_directory)
 
     def export_coil(self):
         self.submit()

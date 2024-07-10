@@ -18,53 +18,67 @@ TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
-    def create_board_and_plot(lines, layer, filename):
-        board = pcbnew.BOARD()
+    # Initialize the board
+    board = pcbnew.BOARD()
 
-        for start, end in lines:
+    def add_track(board, start, end, traceWidth, layer):
+        if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
-            track.SetWidth(int(coil.traceWidth * 1e6))
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((-start[1] + offset[1]) * 1e6)))
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((-end[1] + offset[1]) * 1e6)))
+            track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             track.SetLayer(layer)
             board.Add(track)
+        else:
+            print(f"Invalid coordinates: start={start}, end={end}")
 
-        temp_board_file = os.path.join(TEMP_DIR, f"temp_{filename}.kicad_pcb")
-        pcbnew.SaveBoard(temp_board_file, board)
+    # Add coil tracks
+    for line in coil_line_list:
+        if len(line) == 2:
+            start, end = line
+            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
-        plot_controller = pcbnew.PLOT_CONTROLLER(board)
-        plot_options = plot_controller.GetPlotOptions()
-        plot_options.SetOutputDirectory(output_directory)
-        plot_options.SetPlotFrameRef(False)
-        plot_options.SetAutoScale(False)
-        plot_options.SetMirror(False)
-        plot_options.SetUseGerberAttributes(False)
-        plot_options.SetPlotMode(pcbnew.FILLED)
-        plot_options.SetPlotViaOnMaskLayer(False)
-        plot_options.SetSkipPlotNPTH_Pads(False)
-        plot_options.SetSubtractMaskFromSilk(False)
-        plot_options.SetFormat(pcbnew.PLOT_FORMAT_SVG)
+    # Add loop antenna tracks
+    for start, end in loop_line_list:
+        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
 
-        plot_controller.SetLayer(layer)
-        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_SVG, f"Generated {filename}")
-        plot_controller.PlotLayer()
-        plot_controller.ClosePlot()
+    # Save the board to a temporary file in the Temp directory
+    temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
+    pcbnew.SaveBoard(temp_board_file, board)
 
-        logger.info(f"SVG file generated as {output_directory}/{filename}.svg")
+    # Plot to SVG
+    plot_controller = pcbnew.PLOT_CONTROLLER(board)
+    plot_options = plot_controller.GetPlotOptions()
 
-    # Generate coil SVG
-    coil_filename = f"coil_d{coil.outerDiameter:.1f}_t{coil.traceWidth:.2f}_s{coil.traceSpacing:.2f}"
-    create_board_and_plot(coil_line_list, pcbnew.F_Cu, coil_filename)
+    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetPlotFrameRef(False)
+    plot_options.SetAutoScale(False)
+    plot_options.SetMirror(False)
+    plot_options.SetUseGerberAttributes(False)
+    plot_options.SetScale(1)
+    plot_options.SetPlotMode(pcbnew.FILLED)
+    plot_options.SetPlotViaOnMaskLayer(False)
+    plot_options.SetSkipPlotNPTH_Pads(False)
+    plot_options.SetSubtractMaskFromSilk(False)
 
-    # Generate loop antenna SVG if loop_line_list is not empty
+    # Plot the F.Cu (Front Copper) layer
+    plot_controller.SetLayer(pcbnew.F_Cu)
+    plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
+    plot_controller.PlotLayer()
+
+    # Plot the B.Cu (Back Copper) layer if loop antenna exists
     if loop_line_list:
-        loop_filename = f"loop_d{coil.loop_diameter:.1f}_t{coil.traceWidth:.2f}"
-        create_board_and_plot(loop_line_list, pcbnew.B_Cu, loop_filename)
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile("loop", pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.PlotLayer()
+
+    # Finalize the plot
+    plot_controller.ClosePlot()
+
+    print(f"SVG file(s) generated in {output_directory}")
 
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list):
@@ -76,45 +90,59 @@ def initialize_svg_generation(coil, coil_line_list, loop_line_list):
         generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100))
 
 def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
-    def create_board_and_plot(lines, layer, filename):
-        board = pcbnew.BOARD()
+    # Initialize the board
+    board = pcbnew.BOARD()
 
-        for start, end in lines:
+    def add_track(board, start, end, traceWidth, layer):
+        if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
-            track.SetWidth(int(coil.traceWidth * 1e6))
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((-start[1] + offset[1]) * 1e6)))
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((-end[1] + offset[1]) * 1e6)))
+            track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             track.SetLayer(layer)
             board.Add(track)
+        else:
+            print(f"Invalid coordinates: start={start}, end={end}")
 
-        temp_board_file = os.path.join(TEMP_DIR, f"temp_{filename}.kicad_pcb")
-        pcbnew.SaveBoard(temp_board_file, board)
+    # Add coil tracks
+    for line in coil_line_list:
+        if len(line) == 2:
+            start, end = line
+            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
-        plot_controller = pcbnew.PLOT_CONTROLLER(board)
-        plot_options = plot_controller.GetPlotOptions()
-        plot_options.SetOutputDirectory(output_directory)
-        plot_options.SetPlotFrameRef(False)
-        plot_options.SetAutoScale(False)
-        plot_options.SetMirror(False)
-        plot_options.SetUseGerberAttributes(True)
-        plot_options.SetPlotMode(pcbnew.PLOT_MODE_FILLED)
-        plot_options.SetLineWidth(pcbnew.FromMM(0.1))
+    # Add loop antenna tracks
+    for start, end in loop_line_list:
+        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
 
-        plot_controller.SetLayer(layer)
-        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_GERBER, f"Generated {filename}")
-        plot_controller.PlotLayer()
-        plot_controller.ClosePlot()
+    # Save the board to a temporary file in the Temp directory
+    temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
+    pcbnew.SaveBoard(temp_board_file, board)
 
-        logger.info(f"Gerber file generated as {output_directory}/{filename}.gbr")
+    # Plot to Gerber
+    plot_controller = pcbnew.PLOT_CONTROLLER(board)
+    plot_options = plot_controller.GetPlotOptions()
 
-    # Generate coil Gerber
-    coil_filename = f"coil_d{coil.diam:.1f}_t{coil.traceWidth:.2f}_s{coil.clearance:.2f}_turns{coil.turns}"
-    create_board_and_plot(coil_line_list, pcbnew.F_Cu, coil_filename)
+    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetPlotFrameRef(False)
+    plot_options.SetAutoScale(False)
+    plot_options.SetMirror(False)
+    plot_options.SetUseGerberAttributes(True)
+    plot_options.SetScale(1)
+    plot_options.SetPlotMode(pcbnew.FILLED)
+    plot_options.SetPlotViaOnMaskLayer(False)
+    plot_options.SetSkipPlotNPTH_Pads(False)
+    plot_options.SetSubtractMaskFromSilk(False)
 
-    # Generate loop antenna Gerber if loop_line_list is not empty
-    if loop_line_list:
-        loop_filename = f"loop_d{coil.loop_diameter:.1f}_t{coil.traceWidth:.2f}"
-        create_board_and_plot(loop_line_list, pcbnew.B_Cu, loop_filename)
+    # Plot only the Front Copper layer to Gerber
+    plot_controller.SetLayer(pcbnew.F_Cu)
+    plot_controller.OpenPlotfile("F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Front Copper Layer")
+    plot_controller.PlotLayer()
+
+    # Finalize the plot
+    plot_controller.ClosePlot()
+    print(f"Gerber file generated as {output_directory}/F_Cu.gbr")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -125,44 +153,64 @@ def initialize_gerber_generation(coil, coil_line_list, loop_line_list):
         generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100))
 
 def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
-    def create_board_and_plot(lines, layer, filename):
-        board = pcbnew.BOARD()
+    # Initialize the board
+    board = pcbnew.BOARD()
 
-        for start, end in lines:
+    def add_track(board, start, end, traceWidth, layer):
+        if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
+            start_flipped = (start[0], -start[1])
+            end_flipped = (end[0], -end[1])
             track = pcbnew.PCB_TRACK(board)
-            track.SetWidth(int(coil.traceWidth * 1e6))
-            track.SetStart(pcbnew.VECTOR2I(int((start[0] + offset[0]) * 1e6), int((-start[1] + offset[1]) * 1e6)))
-            track.SetEnd(pcbnew.VECTOR2I(int((end[0] + offset[0]) * 1e6), int((-end[1] + offset[1]) * 1e6)))
+            track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
+            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
+            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             track.SetLayer(layer)
             board.Add(track)
+        else:
+            print(f"Invalid coordinates: start={start}, end={end}")
 
-        temp_board_file = os.path.join(TEMP_DIR, f"temp_{filename}.kicad_pcb")
-        pcbnew.SaveBoard(temp_board_file, board)
+    # Add coil tracks
+    for line in coil_line_list:
+        if len(line) == 2:
+            start, end = line
+            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
-        plot_controller = pcbnew.PLOT_CONTROLLER(board)
-        plot_options = plot_controller.GetPlotOptions()
-        plot_options.SetOutputDirectory(output_directory)
-        plot_options.SetPlotFrameRef(False)
-        plot_options.SetAutoScale(False)
-        plot_options.SetMirror(False)
-        plot_options.SetDXFPlotUnits(pcbnew.DXF_PLOTTER.DXF_UNIT_MILLIMETERS)
-        plot_options.SetPlotMode(pcbnew.PLOT_MODE_FILLED)
+    # Add loop antenna tracks
+    for start, end in loop_line_list:
+        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
 
-        plot_controller.SetLayer(layer)
-        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_DXF, f"Generated {filename}")
-        plot_controller.PlotLayer()
-        plot_controller.ClosePlot()
+    # Save the board to a temporary file in the Temp directory
+    temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
+    pcbnew.SaveBoard(temp_board_file, board)
 
-        logger.info(f"DXF file generated as {output_directory}/{filename}.dxf")
+    # Plot to DXF
+    plot_controller = pcbnew.PLOT_CONTROLLER(board)
+    plot_options = plot_controller.GetPlotOptions()
 
-    # Generate coil DXF
-    coil_filename = f"coil_d{coil.diam:.1f}_t{coil.traceWidth:.2f}_s{coil.clearance:.2f}_turns{coil.turns}"
-    create_board_and_plot(coil_line_list, pcbnew.F_Cu, coil_filename)
+    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetPlotFrameRef(False)
+    plot_options.SetAutoScale(False)
+    plot_options.SetMirror(False)
+    plot_options.SetUseGerberAttributes(False)
+    plot_options.SetScale(1)
+    plot_options.SetPlotMode(pcbnew.FILLED)
+    plot_options.SetPlotViaOnMaskLayer(False)
+    plot_options.SetSkipPlotNPTH_Pads(False)
+    plot_options.SetSubtractMaskFromSilk(False)
 
-    # Generate loop antenna DXF if loop_line_list is not empty
-    if loop_line_list:
-        loop_filename = f"loop_d{coil.loop_diameter:.1f}_t{coil.traceWidth:.2f}"
-        create_board_and_plot(loop_line_list, pcbnew.B_Cu, loop_filename)
+    # Set up the DXF plot
+    plot_options.SetFormat(pcbnew.PLOT_FORMAT_DXF)
+
+    # Plot the F.Cu (Front Copper) layer
+    plot_controller.SetLayer(pcbnew.F_Cu)
+    plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
+    plot_controller.PlotLayer()
+
+    # Finalize the plot
+    plot_controller.ClosePlot()
+
+    print(f"DXF file generated as {output_directory}/coil.dxf")
+
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
     root.withdraw()  # Hide the root window
