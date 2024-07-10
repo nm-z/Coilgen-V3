@@ -334,7 +334,7 @@ class coilClass:
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
 
-# Note
+# edit
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
