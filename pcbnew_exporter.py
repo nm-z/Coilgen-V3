@@ -18,6 +18,9 @@ TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
+def generateCoilFilename(coil):
+    return f"d{coil.outerDiameter:.1f}_t{coil.traceWidth:.2f}_s{coil.traceSpacing:.2f}"
+
 def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
     # Initialize the board
     board = pcbnew.BOARD()
@@ -35,15 +38,15 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add coil tracks
-    for line in coil_line_list:
-        if len(line) == 2:
-            start, end = line
-            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
-
-    # Add loop antenna tracks
-    for start, end in loop_line_list:
-        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    # Add tracks based on which list is provided
+    if loop_line_list:
+        for start, end in loop_line_list:
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    elif coil_line_list:
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
@@ -64,22 +67,20 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Plot the F.Cu (Front Copper) layer
-    plot_controller.SetLayer(pcbnew.F_Cu)
-    plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
-    plot_controller.PlotLayer()
-
-    # Plot the B.Cu (Back Copper) layer if loop antenna exists
+    # Plot the appropriate layer
     if loop_line_list:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile("loop", pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.OpenPlotfile("Loop", pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.PlotLayer()
+    elif coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
         plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"SVG file(s) generated in {output_directory}")
-
+    print(f"SVG file generated in {output_directory}")
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -106,15 +107,15 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add coil tracks
-    for line in coil_line_list:
-        if len(line) == 2:
-            start, end = line
-            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
-
-    # Add loop antenna tracks
-    for start, end in loop_line_list:
-        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    # Add tracks based on which list is provided
+    if loop_line_list:
+        for start, end in loop_line_list:
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    elif coil_line_list:
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
@@ -135,14 +136,19 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Plot only the Front Copper layer to Gerber
-    plot_controller.SetLayer(pcbnew.F_Cu)
-    plot_controller.OpenPlotfile("F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Front Copper Layer")
-    plot_controller.PlotLayer()
+    # Plot the appropriate layer
+    if loop_line_list:
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile("Loop_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
+        plot_controller.PlotLayer()
+    elif coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile("coil_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Coil Front Copper Layer")
+        plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
-    print(f"Gerber file generated as {output_directory}/F_Cu.gbr")
+    print(f"Gerber file generated in {output_directory}")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -169,15 +175,15 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add coil tracks
-    for line in coil_line_list:
-        if len(line) == 2:
-            start, end = line
-            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
-
-    # Add loop antenna tracks
-    for start, end in loop_line_list:
-        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    # Add tracks based on which list is provided
+    if loop_line_list:
+        for start, end in loop_line_list:
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    elif coil_line_list:
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
@@ -201,15 +207,20 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Set up the DXF plot
     plot_options.SetFormat(pcbnew.PLOT_FORMAT_DXF)
 
-    # Plot the F.Cu (Front Copper) layer
-    plot_controller.SetLayer(pcbnew.F_Cu)
-    plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
-    plot_controller.PlotLayer()
+    # Plot the appropriate layer
+    if loop_line_list:
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile("Loop", pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
+        plot_controller.PlotLayer()
+    elif coil_line_list:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile("coil", pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
+        plot_controller.PlotLayer()
 
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"DXF file generated as {output_directory}/coil.dxf")
+    print(f"DXF file generated in {output_directory}")
 
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
@@ -236,26 +247,38 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add coil tracks
-    for line in coil_line_list:
-        if len(line) == 2:
-            start, end = line
-            add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
-
-    # Add loop antenna tracks
-    for start, end in loop_line_list:
-        add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    # Add tracks based on which list is provided
+    if loop_line_list:
+        for start, end in loop_line_list:
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    elif coil_line_list:
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
     pcbnew.SaveBoard(temp_board_file, board)
 
     # Generate the drill files
-    drl_writer = pcbnew.EXCELLON_WRITER(board)
-    drl_writer.SetMapFileFormat(pcbnew.PLOT_FORMAT_PDF)
-    drl_writer.SetOptions(False, False, pcbnew.VECTOR2I(0, 0), False)
-    drl_writer.SetFormat(True)
-    drl_writer.CreateDrillandMapFilesSet(output_directory, True, False)
+    excellon_writer = pcbnew.EXCELLON_WRITER(board)
+    excellon_writer.SetMapFileFormat(pcbnew.PLOT_FORMAT_PDF)
+    excellon_writer.SetOptions(False, False, pcbnew.VECTOR2I(0, 0), False)
+    excellon_writer.SetFormat(True)
+
+    # Generate unique filenames for coil and loop drill files
+    coil_filename = f"coil_{generateCoilFilename(coil)}"
+    loop_filename = f"loop_{generateCoilFilename(coil)}"
+
+    # Generate drill files
+    if coil_line_list:
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-NPTH.drl"))
+
+    if loop_line_list:
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-NPTH.drl"))
 
     print(f"Drill files generated in {output_directory}")
 
@@ -290,3 +313,6 @@ def export_loop(coil, loop_line_list, export_options):
                 initialize_dxf_generation(coil, [], loop_line_list)
             elif option == 'Drill':
                 initialize_drill_generation(coil, [], loop_line_list)
+
+    # Debug print
+    print(f"Loop line list: {loop_line_list}")

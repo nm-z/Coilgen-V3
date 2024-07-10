@@ -35,7 +35,7 @@ class _shapeBaseClass:
     def calcPos(itt:int|float,diam:float,clearance:float,traceWidth:float,CCW:bool)->tuple[float, float]:  ... # the modern python way of type-hinting an undefined function
     @staticmethod
     def calcLength(itt:int|float,diam:float,clearance:float,traceWidth:float)->float:  ...
-    isDiscrete: bool = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
+    isDiscrete = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
     def __repr__(self): # prints the name of the shape
         return("shape("+(self.__class__.__name__)+")")
 

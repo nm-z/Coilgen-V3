@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import pcbnew_exporter
 
 
@@ -128,7 +128,7 @@ class CoilParameterGUI:
             'SVG': tk.BooleanVar(value=True),
             'Gerber': tk.BooleanVar(value=True),
             'DXF': tk.BooleanVar(value=True),
-            'Drill': tk.BooleanVar(value=True)
+            'Drill': tk.BooleanVar(value=False)
         }
 
         for idx, (option, var) in enumerate(self.export_options.items()):
@@ -154,13 +154,26 @@ class CoilParameterGUI:
         return coil
 
     def export_coil(self):
+        if not self.coil_enabled.get():
+            tk.messagebox.showerror("Error", "Coil must be enabled to export.")
+            return
         self.submit()
         coil = self.update_callback(self.params)
         coil_line_list = coil.renderAsCoordinateList()
         pcbnew_exporter.export_coil(coil, coil_line_list, self.export_options)
 
     def export_loop(self):
+        if not self.loop_enabled.get():
+            tk.messagebox.showerror("Error", "Loop must be enabled to export.")
+            return
         self.submit()
         coil = self.update_callback(self.params)
         loop_line_list = coil.render_loop_antenna()
+        
+        # Debug print
+        print(f"Loop enabled: {self.loop_enabled.get()}")
+        print(f"Loop diameter: {self.params['loop_diameter']}")
+        print(f"Loop shape: {self.params['loop_shape']}")
+        print(f"Loop line list: {loop_line_list}")
+        
         pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options)
