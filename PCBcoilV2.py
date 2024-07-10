@@ -8,7 +8,7 @@ import time
 import math  # Import the math module to use its functions
 from typing import Callable
 from numpy import linspace, pi, cos, sin, arctan2  # Import additional functions for rounded corners
-
+# trace too extended
 
 visualization = True  # if you don't have pygame, you can still use the math
 saveToFile = True  # if visualization == False! (if True, then just use 's' key)
@@ -211,6 +211,7 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     filename += '_Re' + str(int(round(coil.calcTotalResistance() * 1000, 0)))
     filename += '_In' + str(int(round(coil.calcInductance() * 1000000000, 0)))
     return filename
+# param
 
 class coilClass:
     def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0, loop_shape='circle'):
@@ -287,56 +288,53 @@ class coilClass:
             line_segments.append((coordinates[i], coordinates[i + 1]))
 
         return line_segments
-
+# loop 
     def render_loop_antenna(self):
         if not self.loop_enabled:
             print("Loop antenna is disabled.")
             return []
 
-        print("Available shapes:", shapes.keys())
-        print("Current loop shape:", self.loop_shape)
-        if self.loop_shape not in shapes:
-            print(f"Error: Shape {self.loop_shape} not recognized.")
-            return []
-        
-        shape_instance = shapes[self.loop_shape]        
-        points = []
-        true_outer_diam = self.calcTrueDiam()  
-        # Adjusting the offset to move the loop next to the coil
+        shape_instance = shapes[self.loop_shape]
+        true_outer_diam = self.calcTrueDiam()
         x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
-        y_offset = (true_outer_diam / 2)  - 20  # KEEP THIS, it sets the y_offset to the middle of the coil
+        y_offset = (true_outer_diam / 2) - 20
         loop_radius = self.loop_diameter / 2
-        adjusted_radius = loop_radius - (self.traceWidth / 2)  # Adjust radius to account for trace width
-        
-        if isinstance(shape_instance, squareSpiral):
-            side_length = adjusted_radius * 2  # Full diameter to side length for square
+        adjusted_radius = loop_radius - (self.traceWidth / 2)
+
+        points = []
+        if isinstance(shape_instance, circularSpiral):
+            # Generate arc segments for circular loop
+            num_segments = 64  # Increase for smoother circles
+            for i in range(num_segments):
+                angle_start = 2 * np.pi * i / num_segments
+                angle_end = 2 * np.pi * (i + 1) / num_segments
+                x_start = x_offset + adjusted_radius * np.cos(angle_start)
+                y_start = y_offset + adjusted_radius * np.sin(angle_start)
+                x_end = x_offset + adjusted_radius * np.cos(angle_end)
+                y_end = y_offset + adjusted_radius * np.sin(angle_end)
+                points.append(((x_start, y_start), (x_end, y_end)))
+        elif isinstance(shape_instance, squareSpiral):
+            # Generate segments for square loop
+            side_length = adjusted_radius * 2
             half_side = side_length / 2
-            corner_radius = 0.5  # Define the radius of the corner curve
-            points = [
-                (x_offset + half_side - corner_radius, y_offset + half_side),
-                (x_offset + half_side, y_offset + half_side - corner_radius),
-                (x_offset + half_side, y_offset - half_side + corner_radius),
-                (x_offset + half_side - corner_radius, y_offset - half_side),
-                (x_offset - half_side + corner_radius, y_offset - half_side),
-                (x_offset - half_side, y_offset - half_side + corner_radius),
-                (x_offset - half_side, y_offset + half_side - corner_radius),
-                (x_offset - half_side + corner_radius, y_offset + half_side),
-                (x_offset + half_side - corner_radius, y_offset + half_side)  # Closing the square with a smooth corner
+            corners = [
+                (x_offset - half_side, y_offset - half_side),
+                (x_offset + half_side, y_offset - half_side),
+                (x_offset + half_side, y_offset + half_side),
+                (x_offset - half_side, y_offset + half_side),
             ]
-        elif isinstance(shape_instance, circularSpiral):
-            # Increase the resolution by using a smaller step size for angle increment
-            step_size = 0.01  # smaller step size for higher resolution
-            points = [(adjusted_radius * np.cos(2 * np.pi * step * step_size) + x_offset, adjusted_radius * np.sin(2 * np.pi * step * step_size) + y_offset) for step in range(int(1/step_size) + 1)]
+            for i in range(4):
+                points.append((corners[i], corners[(i + 1) % 4]))
         else:
             print(f"Shape type {type(shape_instance)} not handled.")
-        
-        
+
         return points
+    
 
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
 
-
+# Note
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
@@ -369,7 +367,7 @@ def update_coil_params(params):
     updated = True  # Set the update flag to true after updating the coil parameters    
     return coil  # Ensure the coil object is returned
     
-
+# Am I synced git with VS ???
 
 # Helper function to flatten nested tuples
 def flatten_and_convert_to_floats(point):
