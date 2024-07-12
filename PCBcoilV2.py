@@ -293,14 +293,13 @@ class coilClass:
             print("Loop antenna is disabled.")
             return []
 
-        print("Available shapes:", shapes.keys())
-        print("Current loop shape:", self.loop_shape)
         if self.loop_shape not in shapes:
             print(f"Error: Shape {self.loop_shape} not recognized.")
             return []
         
         shape_instance = shapes[self.loop_shape]        
         points = []
+        loop_line_list = []
         true_outer_diam = self.calcTrueDiam()  
         # Adjusting the offset to move the loop next to the coil
         x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
@@ -323,15 +322,22 @@ class coilClass:
                 (x_offset - half_side + corner_radius, y_offset + half_side),
                 (x_offset + half_side - corner_radius, y_offset + half_side)  # Closing the square with a smooth corner
             ]
+            for i in range(len(points) - 1):
+                start = points[i]
+                end = points[i + 1]
+                loop_line_list.append((start, end))
         elif isinstance(shape_instance, circularSpiral):
             # Increase the resolution by using a smaller step size for angle increment
             step_size = 0.01  # smaller step size for higher resolution
             points = [(adjusted_radius * np.cos(2 * np.pi * step * step_size) + x_offset, adjusted_radius * np.sin(2 * np.pi * step * step_size) + y_offset) for step in range(int(1/step_size) + 1)]
+            for i in range(len(points) - 1):
+                start = points[i]
+                end = points[i + 1]
+                loop_line_list.append((start, end))
         else:
             print(f"Shape type {type(shape_instance)} not handled.")
         
-        
-        return points
+        return loop_line_list
 
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
