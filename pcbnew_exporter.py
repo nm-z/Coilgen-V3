@@ -1,17 +1,32 @@
 import sys
 import os
 import traceback
+import traceback
 
 # Adjust the path for packaged environment
 if getattr(sys, 'frozen', False):
     kicad_bin_path = os.path.join(sys._MEIPASS, 'KiCad', 'bin')
     print(f"Running from frozen executable. KiCad bin path: {kicad_bin_path}")
+    kicad_bin_path = os.path.join(sys._MEIPASS, 'KiCad', 'bin')
+    print(f"Running from frozen executable. KiCad bin path: {kicad_bin_path}")
 else:
+    kicad_bin_path = r'C:\Program Files\KiCad\8.0\bin'
+    print(f"Running from source. KiCad bin path: {kicad_bin_path}")
     kicad_bin_path = r'C:\Program Files\KiCad\8.0\bin'
     print(f"Running from source. KiCad bin path: {kicad_bin_path}")
 
 sys.path.append(os.path.join(kicad_bin_path, 'Lib', 'site-packages'))
+sys.path.append(os.path.join(kicad_bin_path, 'Lib', 'site-packages'))
 os.add_dll_directory(kicad_bin_path)
+
+try:
+    import pcbnew
+    print(f"pcbnew version: {pcbnew.GetBuildVersion()}")
+except ImportError as e:
+    print(f"Error importing pcbnew: {e}")
+    print(f"sys.path: {sys.path}")
+    print(f"os.environ['PATH']: {os.environ['PATH']}")
+
 
 try:
     import pcbnew
@@ -48,7 +63,7 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
             track.SetLayer(layer)
             board.Add(track)
         else:
-            print(f"Invalid coordinates: start={start}, end={end}")
+            print(f"Skipping invalid coordinates: start={start}, end={end}")
 
     # Add tracks based on which list is provided
     if loop_with_pads:
@@ -84,6 +99,9 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Generate unique filenames for coil and loop
     coil_filename = f"COIL_{coil.generateCoilFilename()}"
     loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+    # Generate unique filenames for coil and loop
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
 
     # Plot the F.Cu (Front Copper) layer
     if coil_line_list:
@@ -100,6 +118,7 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Finalize the plot
     plot_controller.ClosePlot()
 
+    print(f"SVG file(s) generated in {output_directory}")
     print(f"SVG file(s) generated in {output_directory}")
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
@@ -125,7 +144,7 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
             track.SetLayer(layer)
             board.Add(track)
         else:
-            print(f"Invalid coordinates: start={start}, end={end}")
+            print(f"Skipping invalid coordinates: start={start}, end={end}")
 
     # Add tracks based on which list is provided
     if loop_with_pads:
@@ -177,6 +196,7 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
     # Finalize the plot
     plot_controller.ClosePlot()
     print(f"Gerber file(s) generated in {output_directory}")
+    print(f"Gerber file(s) generated in {output_directory}")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
     root = tk.Tk()
@@ -201,7 +221,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
             track.SetLayer(layer)
             board.Add(track)
         else:
-            print(f"Invalid coordinates: start={start}, end={end}")
+            print(f"Skipping invalid coordinates: start={start}, end={end}")
 
     # Add tracks based on which list is provided
     if loop_with_pads:
@@ -241,6 +261,10 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     coil_filename = f"COIL_{coil.generateCoilFilename()}"
     loop_filename = f"LOOP_{coil.generateCoilFilename()}"
 
+    # Generate unique filenames for coil and loop
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+
     # Plot the F.Cu (Front Copper) layer
     if coil_line_list:
         plot_controller.SetLayer(pcbnew.F_Cu)
@@ -257,6 +281,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     plot_controller.ClosePlot()
 
     print(f"DXF file(s) generated in {output_directory}")
+    print(f"DXF file(s) generated in {output_directory}")
 
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
     root = tk.Tk()
@@ -266,6 +291,7 @@ def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pa
     if output_directory:
         generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=loop_with_pads)
 
+def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
 def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
     # Initialize the board
     board = pcbnew.BOARD()
@@ -279,10 +305,20 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
             track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
             track.SetLayer(layer)
+            track.SetLayer(layer)
             board.Add(track)
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
+    # Add tracks based on which list is provided
+    if loop_line_list:
+        for start, end in loop_line_list:
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+    elif coil_line_list:
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
     # Add tracks based on which list is provided
     if loop_line_list:
         for start, end in loop_line_list:
@@ -315,9 +351,27 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
     if loop_line_list:
         excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-PTH.drl"))
         excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-NPTH.drl"))
+    excellon_writer = pcbnew.EXCELLON_WRITER(board)
+    excellon_writer.SetMapFileFormat(pcbnew.PLOT_FORMAT_PDF)
+    excellon_writer.SetOptions(False, False, pcbnew.VECTOR2I(0, 0), False)
+    excellon_writer.SetFormat(True)
+
+    # Generate unique filenames for coil and loop drill files
+    coil_filename = f"COIL_{coil.generateCoilFilename()}"
+    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
+
+    # Generate drill files
+    if coil_line_list:
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-NPTH.drl"))
+
+    if loop_line_list:
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-NPTH.drl"))
 
     print(f"Drill files generated in {output_directory}")
 
+def initialize_drill_generation(coil, coil_line_list, loop_line_list):
 def initialize_drill_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
     root.withdraw()  # Hide the root window
