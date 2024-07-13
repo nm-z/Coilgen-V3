@@ -1,26 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+block_cipher = None
 
 a = Analysis(
     ['PCBcoilV2.py'],
-    pathex=[],
-    binaries=[
-        ('C:\\Users\\natez\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140.dll', '.'),
-        ('C:\\Users\\natez\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140_1.dll', '.')
-    ],  # Add any specific binaries needed by pcbnew_exporter.py here
+    pathex=['C:\\Users\\natez\\PCBcoilGenerator'],
+    binaries=[],
     datas=[
-        ('C:\\Users\\natez\\PCBcoilGenerator\\pcbnew\\bin', 'bin')
-    ],  # Removed the trailing comma and ensured the bracket is closed
-    hiddenimports=[
-        'pcbnew'  # Ensure pcbnew is included if not detected, add any hidden imports used dynamically in pcbnew_exporter.py
+        (r'C:\Program Files\KiCad\8.0\bin\Lib\site-packages\pcbnew.py', 'KiCad/bin/Lib/site-packages'),
+        (r'C:\Program Files\KiCad\8.0\bin\Lib\site-packages\_pcbnew.pyd', 'KiCad/bin/Lib/site-packages'),
+        # Remove kicad.pth as it's not essential
     ],
+    hiddenimports=['pcbnew'],
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    noarchive=False,
-    optimize=0,
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -40,6 +39,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
