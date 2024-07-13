@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from tkinter import ttk, filedialog, messagebox
 import pcbnew_exporter
-
 
 
 class CoilParameterGUI:
