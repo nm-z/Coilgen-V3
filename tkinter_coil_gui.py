@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from PCBcoilV2 import update_coil_params
 import pcbnew_exporter
-
 
 class CoilParameterGUI:
     def __init__(self, master, update_callback):
@@ -36,60 +36,11 @@ class CoilParameterGUI:
         self.create_coil_widgets()
         self.create_loop_widgets()
         self.create_export_widgets()
-        self.create_toggle_buttons()
+        self.create_update_button()
 
-        self.update_button_states()
-
-    def create_toggle_buttons(self):
-        self.toggle_frame = tk.Frame(self.master)
-        self.toggle_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
-
-        self.coil_enabled = tk.BooleanVar(value=False)
+        # Set both coil and loop to always be enabled
+        self.coil_enabled = tk.BooleanVar(value=True)
         self.loop_enabled = tk.BooleanVar(value=True)
-
-        self.coil_button = tk.Button(self.toggle_frame, text="Coil OFF", command=self.toggle_coil, width=20, height=2)
-        self.coil_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
-
-        self.loop_button = tk.Button(self.toggle_frame, text="Loop ON", command=self.toggle_loop, width=20, height=2)
-        self.loop_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
-
-        self.update_button = tk.Button(self.toggle_frame, text="Update", command=self.submit, width=20, height=2)
-        self.update_button.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(5, 0))
-
-        self.update_button_states()
-
-    def toggle_coil(self):
-        self.coil_enabled.set(not self.coil_enabled.get())
-        if not self.coil_enabled.get() and not self.loop_enabled.get():
-            self.loop_enabled.set(True)
-        self.update_button_states()
-        self.submit()
-
-    def toggle_loop(self):
-        self.loop_enabled.set(not self.loop_enabled.get())
-        if not self.coil_enabled.get() and not self.loop_enabled.get():
-            self.coil_enabled.set(True)
-        self.update_button_states()
-        self.submit()
-
-    def update_button_states(self):
-        self.coil_button.config(text="Coil ON" if self.coil_enabled.get() else "Coil OFF",
-                                bg="green" if self.coil_enabled.get() else "red")
-        self.loop_button.config(text="Loop ON" if self.loop_enabled.get() else "Loop OFF",
-                                bg="green" if self.loop_enabled.get() else "red")
-        self.update_widget_states()
-
-    def update_widget_states(self):
-        coil_state = 'normal' if self.coil_enabled.get() else 'disabled'
-        loop_state = 'normal' if self.loop_enabled.get() else 'disabled'
-        
-        for widget in self.coil_frame.winfo_children():
-            if isinstance(widget, (tk.Entry, ttk.Combobox, tk.Button)):
-                widget.config(state=coil_state)
-        
-        for widget in self.loop_frame.winfo_children():
-            if isinstance(widget, (tk.Entry, ttk.Combobox, tk.Button)):
-                widget.config(state=loop_state)
 
     def create_coil_widgets(self):
         self.param_labels = [
@@ -150,6 +101,10 @@ class CoilParameterGUI:
         self.export_loop_button = tk.Button(self.export_frame, text="Export Loop", command=self.export_loop)
         self.export_loop_button.grid(row=len(self.export_options), column=1, pady=5)
 
+    def create_update_button(self):
+        self.update_button = tk.Button(self.master, text="Update", command=self.submit, width=20, height=2)
+        self.update_button.pack(side=tk.BOTTOM, pady=10)
+
     def submit(self):
         self.params = {
             "Turns": int(self.turns_entry.get()),
@@ -161,28 +116,36 @@ class CoilParameterGUI:
             "Copper Thickness": float(self.copper_thickness_entry.get()),
             "Shape": self.shape_var.get(),
             "Formula": self.formula_var.get(),
-            "loop_enabled": self.loop_enabled.get(),
+            "loop_enabled": True,
             "loop_diameter": float(self.loop_diameter_entry.get()),
-            "loop_shape": self.loop_shape_var.get()  # Pass the loop shape
+            "loop_shape": self.loop_shape_var.get()
         }
         coil = self.update_callback(self.params)
         return coil
 
     def export_coil(self):
-        if not self.coil_enabled.get():
-            tk.messagebox.showerror("Error", "Coil must be enabled to export.")
-            return
         self.submit()
         coil = self.update_callback(self.params)
         coil_line_list = coil.renderAsCoordinateList()
         pcbnew_exporter.export_coil(coil, coil_line_list, self.export_options)
 
     def export_loop(self):
-        if not self.loop_enabled.get():
-            tk.messagebox.showerror("Error", "Loop must be enabled to export.")
-            return
         self.submit()
         coil = self.update_callback(self.params)
         loop_line_list = coil.render_loop_antenna()
         loop_with_pads = self.loop_shape_var.get() == 'Loop Antenna with Pads'
         pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, loop_with_pads=loop_with_pads)
+
+
+def main():
+    import tkinter as tk
+    from tkinter_coil_gui import CoilParameterGUI
+
+    root = tk.Tk()
+    root.geometry("400x600")  # Adjust the size as needed
+    app = CoilParameterGUI(root, update_coil_params)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
