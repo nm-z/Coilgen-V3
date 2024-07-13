@@ -292,7 +292,6 @@ def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pa
         generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=loop_with_pads)
 
 def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
-def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
     # Initialize the board
     board = pcbnew.BOARD()
 
@@ -371,7 +370,6 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
 
     print(f"Drill files generated in {output_directory}")
 
-def initialize_drill_generation(coil, coil_line_list, loop_line_list):
 def initialize_drill_generation(coil, coil_line_list, loop_line_list):
     root = tk.Tk()
     root.withdraw()  # Hide the root window
