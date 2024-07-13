@@ -8,7 +8,7 @@ import time
 import math  # Import the math module to use its functions
 from typing import Callable
 from numpy import linspace, pi, cos, sin, arctan2  # Import additional functions for rounded corners
-
+# trace too extended
 
 visualization = True  # if you don't have pygame, you can still use the math
 saveToFile = True  # if visualization == False! (if True, then just use 's' key)
@@ -35,7 +35,7 @@ class _shapeBaseClass:
     def calcPos(itt:int|float,diam:float,clearance:float,traceWidth:float,CCW:bool)->tuple[float, float]:  ... # the modern python way of type-hinting an undefined function
     @staticmethod
     def calcLength(itt:int|float,diam:float,clearance:float,traceWidth:float)->float:  ...
-    isDiscrete: bool = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
+    isDiscrete = True # most of the shapes have a discrete number points/corners/vertices by default. Only continous functions will need a render-resolution parameter
     def __repr__(self): # prints the name of the shape
         return("shape("+(self.__class__.__name__)+")")
 
@@ -199,17 +199,17 @@ def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWid
     return totalInduct
 
 def generateCoilFilename(coil: 'coilClass') -> str:
-    filename = coil.shape.__class__.__name__[0:2]
-    filename += '_di' + str(int(round(coil.diam, 0)))
-    filename += '_tu' + str(coil.turns)
-    filename += '_wi' + str(int(round(coil.traceWidth * 1000, 0)))
-    filename += '_cl' + str(int(round(coil.clearance * 1000, 0)))
-    filename += '_cT' + str(int(round(coil.copperThickness * 1000, 0)))
-    if (coil.layers > 1):
-        filename += '_La' + str(coil.layers)
-        filename += '_Pt' + str(int(round(coil.PCBthickness * 1000, 0)))
-    filename += '_Re' + str(int(round(coil.calcTotalResistance() * 1000, 0)))
-    filename += '_In' + str(int(round(coil.calcInductance() * 1000000000, 0)))
+    filename = coil.shape.__class__.__name__[0:2].upper()
+    filename += f'_di{int(coil.diam)}'
+    filename += f'_tu{coil.turns}'
+    filename += f'_wi{int(coil.traceWidth * 1000)}'
+    filename += f'_cl{int(coil.clearance * 1000)}'
+    filename += f'_cT{int(coil.copperThickness * 1000)}'
+    if coil.layers > 1:
+        filename += f'_La{coil.layers}'
+        filename += f'_Pt{int(coil.PCBthickness * 1000)}'
+    filename += f'_Re{int(coil.calcTotalResistance() * 1000)}'
+    filename += f'_In{int(coil.calcInductance() * 1000000)}'
     return filename
 
 class coilClass:
@@ -287,89 +287,128 @@ class coilClass:
             line_segments.append((coordinates[i], coordinates[i + 1]))
 
         return line_segments
-
+# loop 
     def render_loop_antenna(self):
-        if not self.loop_enabled:
-            print("Loop antenna is disabled.")
-            return []
+        if self.loop_shape == 'Loop Antenna with Pads':
+            loop_trace_width = 0.6096  # Fixed trace width for the loop in mm
+            gap = self.traceWidth  # Gap between the outer edge of the coil and the inner edge of the loop
 
-        print("Available shapes:", shapes.keys())
-        print("Current loop shape:", self.loop_shape)
-        if self.loop_shape not in shapes:
-            print(f"Error: Shape {self.loop_shape} not recognized.")
-            return []
-        
-        shape_instance = shapes[self.loop_shape]        
-        points = []
-        true_outer_diam = self.calcTrueDiam()  
-        # Adjusting the offset to move the loop next to the coil
-        x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
-        y_offset = (true_outer_diam / 2)  - 20  # KEEP THIS, it sets the y_offset to the middle of the coil
-        loop_radius = self.loop_diameter / 2
-        adjusted_radius = loop_radius - (self.traceWidth / 2)  # Adjust radius to account for trace width
-        
-        if isinstance(shape_instance, squareSpiral):
-            side_length = adjusted_radius * 2  # Full diameter to side length for square
-            half_side = side_length / 2
-            corner_radius = 0.5  # Define the radius of the corner curve
-            points = [
-                (x_offset + half_side - corner_radius, y_offset + half_side),
-                (x_offset + half_side, y_offset + half_side - corner_radius),
-                (x_offset + half_side, y_offset - half_side + corner_radius),
-                (x_offset + half_side - corner_radius, y_offset - half_side),
-                (x_offset - half_side + corner_radius, y_offset - half_side),
-                (x_offset - half_side, y_offset - half_side + corner_radius),
-                (x_offset - half_side, y_offset + half_side - corner_radius),
-                (x_offset - half_side + corner_radius, y_offset + half_side),
-                (x_offset + half_side - corner_radius, y_offset + half_side)  # Closing the square with a smooth corner
+            # Calculate the loop's diameter
+            loop_diameter = self.diam + 2 * (gap + loop_trace_width)
+
+            # Calculate half the side of the square loop
+            half_side = loop_diameter / 2
+
+            # Define the loop with a square shape
+            pad_gap = 1.27  # Gap between pads
+            loop_lines = [
+                ((self.x_center - half_side, self.y_center - half_side), (self.x_center + half_side, self.y_center - half_side)),
+                ((self.x_center + half_side, self.y_center - half_side), (self.x_center + half_side, self.y_center + half_side)),
+                ((self.x_center + half_side, self.y_center + half_side), (self.x_center - half_side, self.y_center + half_side)),
+                ((self.x_center - half_side, self.y_center + half_side), (self.x_center - half_side, self.y_center - half_side))
             ]
-        elif isinstance(shape_instance, circularSpiral):
-            # Increase the resolution by using a smaller step size for angle increment
-            step_size = 0.01  # smaller step size for higher resolution
-            points = [(adjusted_radius * np.cos(2 * np.pi * step * step_size) + x_offset, adjusted_radius * np.sin(2 * np.pi * step * step_size) + y_offset) for step in range(int(1/step_size) + 1)]
+
+            # Define pad sizes based on coil diameter
+            if self.diam <= 12:
+                pad_length, pad_width = 1.905, 1.5875
+            else:
+                pad_length, pad_width = 3.81, 3.175
+
+            # Position of pads (pointing downward and moved up by half a trace width)
+            pad_x1_center = self.x_center - pad_gap/2 - pad_width/2
+            pad_x2_center = self.x_center + pad_gap/2 + pad_width/2
+            pad_y_center = self.y_center + half_side + pad_length/2 - loop_trace_width/2
+
+            # Create pads (pointing downward)
+            pad1 = ((pad_x1_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x1_center + pad_width/2, pad_y_center + pad_length/2))
+            pad2 = ((pad_x2_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x2_center + pad_width/2, pad_y_center + pad_length/2))
+
+            # Add horizontal traces from loop corners to pads
+            trace1 = [
+                (self.x_center - half_side, self.y_center + half_side),
+                (pad_x1_center + pad_width/2, self.y_center + half_side)
+            ]
+            trace2 = [
+                (self.x_center + half_side, self.y_center + half_side),
+                (pad_x2_center - pad_width/2, self.y_center + half_side)
+            ]
+
+            return loop_lines + [trace1, trace2, pad1, pad2]
+
+        elif self.loop_shape == 'circle':
+            # Existing code for rendering circular loop antenna
+            shape_instance = shapes[self.loop_shape]
+            true_outer_diam = self.calcTrueDiam()
+            x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
+            y_offset = (true_outer_diam / 2) - 20
+            loop_radius = self.loop_diameter / 2
+            adjusted_radius = loop_radius - (self.traceWidth / 2)
+
+            points = []
+            num_segments = 64  # Increase for smoother circles
+            for i in range(num_segments):
+                angle_start = 2 * np.pi * i / num_segments
+                angle_end = 2 * np.pi * (i + 1) / num_segments
+                x_start = x_offset + adjusted_radius * np.cos(angle_start)
+                y_start = y_offset + adjusted_radius * np.sin(angle_start)
+                x_end = x_offset + adjusted_radius * np.cos(angle_end)
+                y_end = y_offset + adjusted_radius * np.sin(angle_end)
+                points.append(((x_start, y_start), (x_end, y_end)))
+            return points
+        elif self.loop_shape == 'square':
+            # Existing code for rendering square loop antenna
+            shape_instance = shapes[self.loop_shape]
+            true_outer_diam = self.calcTrueDiam()
+            x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
+            y_offset = (true_outer_diam / 2) - 20
+            loop_radius = self.loop_diameter / 2
+            adjusted_radius = loop_radius - (self.traceWidth / 2)
+
+            side_length = adjusted_radius * 2
+            half_side = side_length / 2
+            corners = [
+                (x_offset - half_side, y_offset - half_side),
+                (x_offset + half_side, y_offset - half_side),
+                (x_offset + half_side, y_offset + half_side),
+                (x_offset - half_side, y_offset + half_side),
+            ]
+            points = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+            return points
         else:
-            print(f"Shape type {type(shape_instance)} not handled.")
-        
-        
-        return points
+            print(f"Unsupported loop shape: {self.loop_shape}")
+            return []
+    
 
     def generateCoilFilename(self):
         return(generateCoilFilename(self))
 
-    def saveDXF(self) -> list[str]:
-        import DXFexporter as DXFexp
-        filenames: list[str] = []
-        for outputFormat in DXFexp.DXFoutputFormats:
-            filenames += DXFexp.saveDXF(self, outputFormat)
-        return(filenames)
-
-    def to_excel(self, filename:str = None) -> str:
-        """ produce an excel file with only 1 row of data; this coil """
-        import excelExporter as excExp
-        if(filename is None):  filename = self.generateCoilFilename() + excExp.fileExtension
-        excExp.exportCoils([self,], filename)
-
-    def imwrite(self, *arg) -> list[np.ndarray]:
-        """ just a macro that imports cv2exporter.py and runs .imwrite() with the provided arguments """
-        import cv2exporter as cv2exp
-        cv2exp.imwrite(self, *arg)
 
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
+    turns = int(params["Turns"])
+    diam = float(params["Diameter"])
+    clearance = float(params["Width between traces"])
+    traceWidth = float(params["Trace Width"])
+    layers = int(params["Layers"])
+    PCBthickness = float(params["PCB Thickness"])
+    copperThickness = float(params["Copper Thickness"])
+    shape = params["Shape"]
+    formula = params["Formula"]
+    loop_enabled = params.get("loop_enabled", False)
+    loop_diameter = float(params.get("loop_diameter", 0))
+    loop_shape = params.get("loop_shape", "circle")
+
+    # Handle 'Loop Antenna with Pads' separately
+    if loop_shape == 'Loop Antenna with Pads':
+        coil_loop_shape = 'circle'  # Use circle as a default for the coil
+    else:
+        coil_loop_shape = loop_shape
+
     coil = coilClass(
-        turns=int(params['Turns']),
-        diam=float(params['Diameter']),
-        clearance=float(params['Width between traces']),
-        traceWidth=float(params['Trace Width']),
-        layers=int(params['Layers']),
-        PCBthickness=float(params['PCB Thickness']),
-        copperThickness=float(params['Copper Thickness']),
-        shape=params['Shape'],
-        formula=params['Formula'],
-        loop_enabled=params.get('loop_enabled', False),
-        loop_diameter=float(params.get('loop_diameter', 0)),
-        loop_shape=params.get('loop_shape', 'circle')  # Ensure loop_shape is passed correctly
+        turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
     )
     renderedLineLists = [coil.renderAsCoordinateList()]
     if coil.loop_enabled:
@@ -386,7 +425,7 @@ def update_coil_params(params):
     updated = True  # Set the update flag to true after updating the coil parameters    
     return coil  # Ensure the coil object is returned
     
-
+# Am I synced git with VS ???
 
 # Helper function to flatten nested tuples
 def flatten_and_convert_to_floats(point):
