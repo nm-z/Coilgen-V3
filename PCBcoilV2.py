@@ -289,20 +289,64 @@ class coilClass:
         return line_segments
 # loop 
     def render_loop_antenna(self):
-        if not self.loop_enabled:
-            print("Loop antenna is disabled.")
-            return []
+        if self.loop_shape == 'Loop Antenna with Pads':
+            loop_trace_width = 0.6096  # Fixed trace width for the loop in mm
+            gap = self.traceWidth  # Gap between the outer edge of the coil and the inner edge of the loop
 
-        shape_instance = shapes[self.loop_shape]
-        true_outer_diam = self.calcTrueDiam()
-        x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
-        y_offset = (true_outer_diam / 2) - 20
-        loop_radius = self.loop_diameter / 2
-        adjusted_radius = loop_radius - (self.traceWidth / 2)
+            # Calculate the loop's diameter
+            loop_diameter = self.diam + 2 * (gap + loop_trace_width)
 
-        points = []
-        if isinstance(shape_instance, circularSpiral):
-            # Generate arc segments for circular loop
+            # Calculate half the side of the square loop
+            half_side = loop_diameter / 2
+
+            # Define the loop with a square shape
+            pad_gap = 1.27  # Gap between pads
+            loop_lines = [
+                ((self.x_center - half_side, self.y_center - half_side), (self.x_center + half_side, self.y_center - half_side)),
+                ((self.x_center + half_side, self.y_center - half_side), (self.x_center + half_side, self.y_center + half_side)),
+                ((self.x_center + half_side, self.y_center + half_side), (self.x_center - half_side, self.y_center + half_side)),
+                ((self.x_center - half_side, self.y_center + half_side), (self.x_center - half_side, self.y_center - half_side))
+            ]
+
+            # Define pad sizes based on coil diameter
+            if self.diam <= 12:
+                pad_length, pad_width = 1.905, 1.5875
+            else:
+                pad_length, pad_width = 3.81, 3.175
+
+            # Position of pads (pointing downward and moved up by half a trace width)
+            pad_x1_center = self.x_center - pad_gap/2 - pad_width/2
+            pad_x2_center = self.x_center + pad_gap/2 + pad_width/2
+            pad_y_center = self.y_center + half_side + pad_length/2 - loop_trace_width/2
+
+            # Create pads (pointing downward)
+            pad1 = ((pad_x1_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x1_center + pad_width/2, pad_y_center + pad_length/2))
+            pad2 = ((pad_x2_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x2_center + pad_width/2, pad_y_center + pad_length/2))
+
+            # Add horizontal traces from loop corners to pads
+            trace1 = [
+                (self.x_center - half_side, self.y_center + half_side),
+                (pad_x1_center + pad_width/2, self.y_center + half_side)
+            ]
+            trace2 = [
+                (self.x_center + half_side, self.y_center + half_side),
+                (pad_x2_center - pad_width/2, self.y_center + half_side)
+            ]
+
+            return loop_lines + [trace1, trace2, pad1, pad2]
+
+        elif self.loop_shape == 'circle':
+            # Existing code for rendering circular loop antenna
+            shape_instance = shapes[self.loop_shape]
+            true_outer_diam = self.calcTrueDiam()
+            x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
+            y_offset = (true_outer_diam / 2) - 20
+            loop_radius = self.loop_diameter / 2
+            adjusted_radius = loop_radius - (self.traceWidth / 2)
+
+            points = []
             num_segments = 64  # Increase for smoother circles
             for i in range(num_segments):
                 angle_start = 2 * np.pi * i / num_segments
@@ -312,8 +356,16 @@ class coilClass:
                 x_end = x_offset + adjusted_radius * np.cos(angle_end)
                 y_end = y_offset + adjusted_radius * np.sin(angle_end)
                 points.append(((x_start, y_start), (x_end, y_end)))
-        elif isinstance(shape_instance, squareSpiral):
-            # Generate segments for square loop
+            return points
+        elif self.loop_shape == 'square':
+            # Existing code for rendering square loop antenna
+            shape_instance = shapes[self.loop_shape]
+            true_outer_diam = self.calcTrueDiam()
+            x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
+            y_offset = (true_outer_diam / 2) - 20
+            loop_radius = self.loop_diameter / 2
+            adjusted_radius = loop_radius - (self.traceWidth / 2)
+
             side_length = adjusted_radius * 2
             half_side = side_length / 2
             corners = [
@@ -322,12 +374,11 @@ class coilClass:
                 (x_offset + half_side, y_offset + half_side),
                 (x_offset - half_side, y_offset + half_side),
             ]
-            for i in range(4):
-                points.append((corners[i], corners[(i + 1) % 4]))
+            points = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+            return points
         else:
-            print(f"Shape type {type(shape_instance)} not handled.")
-
-        return points
+            print(f"Unsupported loop shape: {self.loop_shape}")
+            return []
     
 
     def generateCoilFilename(self):
@@ -337,19 +388,27 @@ class coilClass:
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
+    turns = int(params["Turns"])
+    diam = float(params["Diameter"])
+    clearance = float(params["Width between traces"])
+    traceWidth = float(params["Trace Width"])
+    layers = int(params["Layers"])
+    PCBthickness = float(params["PCB Thickness"])
+    copperThickness = float(params["Copper Thickness"])
+    shape = params["Shape"]
+    formula = params["Formula"]
+    loop_enabled = params.get("loop_enabled", False)
+    loop_diameter = float(params.get("loop_diameter", 0))
+    loop_shape = params.get("loop_shape", "circle")
+
+    # Handle 'Loop Antenna with Pads' separately
+    if loop_shape == 'Loop Antenna with Pads':
+        coil_loop_shape = 'circle'  # Use circle as a default for the coil
+    else:
+        coil_loop_shape = loop_shape
+
     coil = coilClass(
-        turns=int(params['Turns']),
-        diam=float(params['Diameter']),
-        clearance=float(params['Width between traces']),
-        traceWidth=float(params['Trace Width']),
-        layers=int(params['Layers']),
-        PCBthickness=float(params['PCB Thickness']),
-        copperThickness=float(params['Copper Thickness']),
-        shape=params['Shape'],
-        formula=params['Formula'],
-        loop_enabled=params.get('loop_enabled', False),
-        loop_diameter=float(params.get('loop_diameter', 0)),
-        loop_shape=params.get('loop_shape', 'circle')  # Ensure loop_shape is passed correctly
+        turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
     )
     renderedLineLists = [coil.renderAsCoordinateList()]
     if coil.loop_enabled:

@@ -20,6 +20,19 @@ class CoilParameterGUI:
         self.notebook.add(self.loop_frame, text='Loop Antenna', sticky='nsew')
         self.notebook.add(self.export_frame, text='Export', sticky='nsew')
 
+        self.shapes = ['square', 'hexagon', 'octagon', 'circle']
+        self.formulas = ['cur_sheet', 'Mohan', 'Jenei', 'Zhao']
+
+        self.defaults = {
+            "Turns": 9,
+            "Diameter": 40,
+            "Width between traces": 0.15,
+            "Trace Width": 0.9,
+            "Layers": 1,
+            "PCB Thickness": 0.6,
+            "Copper Thickness": 0.030
+        }
+
         self.create_coil_widgets()
         self.create_loop_widgets()
         self.create_export_widgets()
@@ -31,13 +44,13 @@ class CoilParameterGUI:
         self.toggle_frame = tk.Frame(self.master)
         self.toggle_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
 
-        self.coil_enabled = tk.BooleanVar(value=True)
-        self.loop_enabled = tk.BooleanVar(value=False)
+        self.coil_enabled = tk.BooleanVar(value=False)
+        self.loop_enabled = tk.BooleanVar(value=True)
 
-        self.coil_button = tk.Button(self.toggle_frame, text="Coil ON", command=self.toggle_coil, width=20, height=2)
+        self.coil_button = tk.Button(self.toggle_frame, text="Coil OFF", command=self.toggle_coil, width=20, height=2)
         self.coil_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
 
-        self.loop_button = tk.Button(self.toggle_frame, text="Loop OFF", command=self.toggle_loop, width=20, height=2)
+        self.loop_button = tk.Button(self.toggle_frame, text="Loop ON", command=self.toggle_loop, width=20, height=2)
         self.loop_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(5, 0))
 
         self.update_button = tk.Button(self.toggle_frame, text="Update", command=self.submit, width=20, height=2)
@@ -79,39 +92,37 @@ class CoilParameterGUI:
                 widget.config(state=loop_state)
 
     def create_coil_widgets(self):
-        self.defaults = {
-            "Turns": 9,
-            "Diameter": 40,
-            "Width between traces": 0.15,
-            "Trace Width": 0.9,
-            "Shape": 'square'
-        }
-        self.shapes = ['square', 'hexagon', 'octagon', 'circle']
-
         self.param_labels = [
-            "Turns", "Diameter", "Width between traces", "Trace Width", "Shape"
+            "Turns", "Diameter", "Width between traces", "Trace Width", "Layers",
+            "PCB Thickness", "Copper Thickness", "Shape", "Formula"
         ]
         self.param_entries = []
 
         for idx, label in enumerate(self.param_labels):
             tk.Label(self.coil_frame, text=label).grid(row=idx, column=0, sticky='w')
             if label == "Shape":
-                combobox = ttk.Combobox(self.coil_frame, values=self.shapes, state='readonly')
-                combobox.set(self.defaults[label])
+                self.shape_var = tk.StringVar(value='square')
+                combobox = ttk.Combobox(self.coil_frame, textvariable=self.shape_var, values=self.shapes, state='readonly')
+                combobox.grid(row=idx, column=1, sticky='ew')
+                self.param_entries.append(combobox)
+            elif label == "Formula":
+                self.formula_var = tk.StringVar(value='cur_sheet')
+                combobox = ttk.Combobox(self.coil_frame, textvariable=self.formula_var, values=self.formulas, state='readonly')
                 combobox.grid(row=idx, column=1, sticky='ew')
                 self.param_entries.append(combobox)
             else:
                 entry = tk.Entry(self.coil_frame)
                 entry.grid(row=idx, column=1, sticky='ew')
-                entry.insert(0, self.defaults[label])
+                entry.insert(0, str(self.defaults.get(label, '')))
                 self.param_entries.append(entry)
+                setattr(self, f"{label.lower().replace(' ', '_')}_entry", entry)
 
         self.coil_frame.columnconfigure(1, weight=1)
 
     def create_loop_widgets(self):
-        self.loop_shape_var = tk.StringVar(value='circle')
+        self.loop_shape_var = tk.StringVar(value='Loop Antenna with Pads')
         self.loop_shape_label = tk.Label(self.loop_frame, text="Loop Antenna Shape")
-        self.loop_shape_combobox = ttk.Combobox(self.loop_frame, textvariable=self.loop_shape_var, values=['circle', 'square'], state='readonly')
+        self.loop_shape_combobox = ttk.Combobox(self.loop_frame, textvariable=self.loop_shape_var, values=['Loop Antenna with Pads', 'circle', 'square'], state='readonly')
         self.loop_shape_combobox.grid(row=0, column=1, sticky='ew')
         self.loop_shape_label.grid(row=0, column=0, sticky='w')
 
@@ -125,9 +136,9 @@ class CoilParameterGUI:
 
     def create_export_widgets(self):
         self.export_options = {
-            'SVG': tk.BooleanVar(value=True),
+            'SVG': tk.BooleanVar(value=False),
             'Gerber': tk.BooleanVar(value=True),
-            'DXF': tk.BooleanVar(value=True)
+            'DXF': tk.BooleanVar(value=False)
         }
 
         for idx, (option, var) in enumerate(self.export_options.items()):
@@ -140,15 +151,20 @@ class CoilParameterGUI:
         self.export_loop_button.grid(row=len(self.export_options), column=1, pady=5)
 
     def submit(self):
-        self.params = {label: entry.get() for label, entry in zip(self.param_labels, self.param_entries)}
-        self.params['coil_enabled'] = self.coil_enabled.get()
-        self.params['loop_enabled'] = self.loop_enabled.get()
-        self.params['loop_diameter'] = self.loop_diameter_entry.get() if self.loop_enabled.get() else 0.0
-        self.params['loop_shape'] = self.loop_shape_var.get() if self.loop_enabled.get() else 'circle'
-        self.params['Layers'] = 2 if self.loop_enabled.get() else 1
-        self.params['PCB Thickness'] = 0.6  # Default value
-        self.params['Copper Thickness'] = 0.035  # Default value
-        self.params['Formula'] = 'cur_sheet'  # Default value
+        self.params = {
+            "Turns": int(self.turns_entry.get()),
+            "Diameter": float(self.diameter_entry.get()),
+            "Width between traces": float(self.width_between_traces_entry.get()),
+            "Trace Width": float(self.trace_width_entry.get()),
+            "Layers": int(self.layers_entry.get()),
+            "PCB Thickness": float(self.pcb_thickness_entry.get()),
+            "Copper Thickness": float(self.copper_thickness_entry.get()),
+            "Shape": self.shape_var.get(),
+            "Formula": self.formula_var.get(),
+            "loop_enabled": self.loop_enabled.get(),
+            "loop_diameter": float(self.loop_diameter_entry.get()),
+            "loop_shape": self.loop_shape_var.get()  # Pass the loop shape
+        }
         coil = self.update_callback(self.params)
         return coil
 
@@ -168,4 +184,5 @@ class CoilParameterGUI:
         self.submit()
         coil = self.update_callback(self.params)
         loop_line_list = coil.render_loop_antenna()
-        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options)
+        loop_with_pads = self.loop_shape_var.get() == 'Loop Antenna with Pads'
+        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, loop_with_pads=loop_with_pads)
