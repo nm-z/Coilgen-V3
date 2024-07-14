@@ -44,7 +44,7 @@ class CoilParameterGUI:
     def create_coil_widgets(self):
         self.param_labels = [
             "Turns", "Diameter", "Width between traces", "Trace Width", "Layers",
-            "PCB Thickness", "Copper Thickness", "Shape", "Formula"
+            "PCB Thickness", "Copper Thickness", "Shape", "Formula", "Square Calculation"
         ]
         self.param_entries = []
 
@@ -58,6 +58,11 @@ class CoilParameterGUI:
             elif label == "Formula":
                 self.formula_var = tk.StringVar(value='wheeler')
                 combobox = ttk.Combobox(self.coil_frame, textvariable=self.formula_var, values=self.formulas, state='readonly')
+                combobox.grid(row=idx, column=1, sticky='ew')
+                self.param_entries.append(combobox)
+            elif label == "Square Calculation":
+                self.square_calc_var = tk.StringVar(value='Planar inductor')
+                combobox = ttk.Combobox(self.coil_frame, textvariable=self.square_calc_var, values=['Planar inductor', 'thijses/PCBcoilGenerator'], state='readonly')
                 combobox.grid(row=idx, column=1, sticky='ew')
                 self.param_entries.append(combobox)
             else:
@@ -117,7 +122,8 @@ class CoilParameterGUI:
             "Formula": self.formula_var.get(),
             "loop_enabled": True,
             "loop_diameter": float(self.loop_diameter_entry.get()),
-            "loop_shape": self.loop_shape_var.get()
+            "loop_shape": self.loop_shape_var.get(),
+            "square_calc": self.square_calc_var.get()
         }
         coil = self.update_callback(self.params)
         return coil

@@ -93,6 +93,18 @@ class squareSpiral(_shapeBaseClass):
                 return (-r, -r)
             else:
                 return (r, -r)
+            
+
+
+    @staticmethod
+    def calcPos_alt(itt: int, diam: float, clearance: float, traceWidth: float, CCW=False) -> tuple[float, float]:
+        """ input is the number of steps (corners), 4 steps would be a full circle, generally: itt=(stepsPerTurn*turns)
+            output is a 2D coordinate along the spiral, starting outwards """
+        spacing = calcTraceSpacing(clearance, traceWidth)
+        x =      (1 if (((itt%4)>=2) ^ CCW) else -1)      * (((diam-traceWidth)/2) - ((itt//4)     * spacing))
+        y = (1 if (((itt%4)==1) or ((itt%4)==2)) else -1) * (((diam-traceWidth)/2) - (((itt-1)//4) * spacing))
+        return(x,y)
+
 
     @staticmethod
     def calcLength(itt: float, diam: float, clearance: float, traceWidth: float) -> float:
@@ -116,6 +128,17 @@ class squareSpiral(_shapeBaseClass):
             length += 4 * (2 * r) * (n_turns % 1)
         
         return length
+
+    @staticmethod
+    def calcLength_alt(itt: int, diam: float, clearance: float, traceWidth: float) -> float:
+        """ returns the length of the spiral at a given itt (without iterating, direct calculation) """
+        spacing = calcTraceSpacing(clearance, traceWidth)
+        horLines = (itt//2)
+        sumOfWidths = (horLines * (diam-traceWidth)) - ((((horLines-1)*horLines) / 2) * spacing) # length of all hor. lines = (horLines * diam) - triangular number of (horLines-1)
+        vertLines = ((itt+1)//2)
+        sumOfHeights = (vertLines * (diam-traceWidth)) - ((max(((vertLines-2)*(vertLines-1)) / 2, 0) - 1) * spacing) # length of all vert. lines
+        return(sumOfWidths + sumOfHeights)
+        ## paper[3] mentioned the formula: 4*turns*diam - 4*turns*tracewidth - (2*turns+1)^2 * (spacing)   but, please review their definitions of outer diameter and spacing before using this!
 
 class circularSpiral(_shapeBaseClass):
     """ (static class) class to hold parameters and functions for circularly shaped coils """
@@ -264,7 +287,7 @@ def generateCoilFilename(coil: 'coilClass') -> str:
     return filename
 
 class coilClass:
-    def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0, loop_shape='circle'):
+    def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0, loop_shape='circle', calcPos=None, calcLength=None):
         self.turns = turns
         self.diam = diam
         self.clearance = clearance
@@ -284,6 +307,8 @@ class coilClass:
             self.loop_shape = loop_shape  # Store the key
         else:
             raise ValueError(f"Loop shape {loop_shape} is not recognized. Available shapes are: {list(shapes.keys())}")
+        self.calcPos = calcPos if calcPos else self.shape.calcPos
+        self.calcLength = calcLength if calcLength else self.shape.calcLength
 
     def calcCoilTraceLength(self):
         return self.shape.calcLength(self.turns * self.shape.stepsPerTurn, self.diam, self.clearance, self.traceWidth) * self.layers
@@ -333,44 +358,49 @@ class coilClass:
             if abs(n_turns - self.turns) > 0.01:
                 print(f'[WARNING] square coil can only have integer number of turns; reducing n_turns to {n_turns}')
 
-            points = []
-            r_outer = self.diam / 2
-            r_inner = self.calcSimpleInnerDiam() / 2
+            if self.calcPos == self.shape.calcPos:
+                points = []
+                r_outer = self.diam / 2
+                r_inner = self.calcSimpleInnerDiam() / 2
 
-            spacing = self.calcTraceSpacing()
+                spacing = self.calcTraceSpacing()
 
-            points = [(r_outer, -r_outer)]
-            for i in range(n_turns):
-                r = r_outer - i * spacing
-                next_r = r - spacing
-                if not (self.CCW ^ reverseDirection):
-                    turn_points = [
-                        (-r, -r),
-                        (-r, r),
-                        (r, r),
-                        (r, -next_r),
-                    ]
-                else:
-                    turn_points = [
-                        (r, r),
-                        (-r, r),
-                        (-r, -r),
-                        (next_r, -r),
-                    ]
-                points.extend(turn_points)
+                points = [(r_outer, -r_outer)]
+                for i in range(n_turns):
+                    r = r_outer - i * spacing
+                    next_r = r - spacing
+                    if not (self.CCW ^ reverseDirection):
+                        turn_points = [
+                            (-r, -r),
+                            (-r, r),
+                            (r, r),
+                            (r, -next_r),
+                        ]
+                    else:
+                        turn_points = [
+                            (r, r),
+                            (-r, r),
+                            (-r, -r),
+                            (next_r, -r),
+                        ]
+                    points.extend(turn_points)
 
-            # Convert list of points to list of line segments
-            line_segments = []
-            for i in range(len(points) - 1):
-                line_segments.append((points[i], points[i + 1]))
+                # Convert list of points to list of line segments
+                line_segments = []
+                for i in range(len(points) - 1):
+                    line_segments.append((points[i], points[i + 1]))
 
-            # Print trace lengths for square coil
-            print("Trace Lengths for Square Coil:")
-            for i, segment in enumerate(line_segments):
-                length = math.sqrt((segment[1][0] - segment[0][0])**2 + (segment[1][1] - segment[0][1])**2)
-                print(f"Trace {i+1} Length: {length:.2f} mm")
+                # Print trace lengths for square coil
+                print("Trace Lengths for Square Coil:")
+                for i, segment in enumerate(line_segments):
+                    length = math.sqrt((segment[1][0] - segment[0][0])**2 + (segment[1][1] - segment[0][1])**2)
+                    print(f"Trace {i+1} Length: {length:.2f} mm")
 
-            return line_segments
+                return line_segments
+            else:
+                coordinates = [self.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
+                if len(coordinates) % 10 == 0:  # Example condition: print only if the number of coordinates is a multiple of 10
+                    print(f"renderAsCoordinateList (Discrete): {len(coordinates)} points")
 
         else:
             angleRes = angleResOverride if angleResOverride else angleRenderResDefault
@@ -383,9 +413,7 @@ class coilClass:
         for i in range(len(coordinates) - 1):
             line_segments.append((coordinates[i], coordinates[i + 1]))
 
-            return line_segments
-        
-
+        return line_segments
 
 # loop 
     def render_loop_antenna(self):
@@ -514,6 +542,7 @@ def update_coil_params(params):
     copperThickness = float(params["Copper Thickness"])
     shape = params["Shape"]
     formula = params["Formula"]
+    square_calc = params.get("square_calc", 'Planar inductor')
     loop_enabled = params.get("loop_enabled", False)
     loop_diameter = float(params.get("loop_diameter", 0))
     loop_shape = params.get("loop_shape", "circle")
@@ -524,9 +553,21 @@ def update_coil_params(params):
     else:
         coil_loop_shape = loop_shape
 
-    coil = coilClass(
-        turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
-    )
+    if shape == 'square':
+        if square_calc == 'thijses/PCBcoilGenerator':
+            coil = coilClass(
+                turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape,
+                calcPos=squareSpiral.calcPos_alt, calcLength=squareSpiral.calcLength_alt
+            )
+        else:
+            coil = coilClass(
+                turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
+            )
+    else:
+        coil = coilClass(
+            turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
+        )
+
     renderedLineLists = [coil.renderAsCoordinateList()]
     if coil.loop_enabled:
         loop_antenna_coords = coil.render_loop_antenna()
@@ -567,7 +608,8 @@ def main():
     initial_params = {
         "Turns": 4, "Diameter": 10, "Width between traces": 0.5, "Trace Width": 0.5, 
         "Layers": 1, "PCB Thickness": 0.6, "Copper Thickness": 0.030, 
-        "Shape": 'square', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0, "loop_shape": 'circle'
+        "Shape": 'square', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0, "loop_shape": 'circle',
+        "square_calc": 'Planar inductor'
     }
 
     if visualization:
