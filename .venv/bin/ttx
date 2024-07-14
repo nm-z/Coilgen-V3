@@ -1,4 +1,4 @@
-#!/home/nate/Desktop/PCBcoilGenerator-2/.venv/bin/python
+#!/home/nate/Desktop/PCBcoilGenerator-Linux/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

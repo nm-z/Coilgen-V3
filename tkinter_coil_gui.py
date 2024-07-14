@@ -21,16 +21,15 @@ class CoilParameterGUI:
         self.notebook.add(self.export_frame, text='Export', sticky='nsew')
 
         self.shapes = ['square', 'hexagon', 'octagon', 'circle']
-        self.formulas = ['cur_sheet', 'Mohan', 'Jenei', 'Zhao']
-
+        self.formulas = ['cur_sheet', 'monomial', 'wheeler']
         self.defaults = {
-            "Turns": 9,
-            "Diameter": 40,
-            "Width between traces": 0.15,
-            "Trace Width": 0.9,
+            "Turns": 4,
+            "Diameter": 10,
+            "Width between traces": 0.5,
+            "Trace Width": 0.5,
             "Layers": 1,
             "PCB Thickness": 0.6,
-            "Copper Thickness": 0.030
+            "Copper Thickness": 0.035
         }
 
         self.create_coil_widgets()
@@ -57,7 +56,7 @@ class CoilParameterGUI:
                 combobox.grid(row=idx, column=1, sticky='ew')
                 self.param_entries.append(combobox)
             elif label == "Formula":
-                self.formula_var = tk.StringVar(value='cur_sheet')
+                self.formula_var = tk.StringVar(value='wheeler')
                 combobox = ttk.Combobox(self.coil_frame, textvariable=self.formula_var, values=self.formulas, state='readonly')
                 combobox.grid(row=idx, column=1, sticky='ew')
                 self.param_entries.append(combobox)

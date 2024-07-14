@@ -9,3 +9,7 @@ opencv-python
 matplotlib
 
 
+future       1.0.0
+KicadModTree 1.1.2
+pip          24.1.2
+PyYAML       6.0.1
