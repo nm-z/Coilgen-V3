@@ -9,7 +9,8 @@ if getattr(sys, 'frozen', False):
 else:
     kicad_bin_path = '/usr/bin'  # Default KiCad binary path on Linux
 
-sys.path.append(os.path.join(kicad_bin_path, 'lib/python3/dist-packages'))
+sys.path.append('/usr/lib/python3.12/site-packages')
+sys.path.append('/usr/share/kicad/scripting')
 import pcbnew
 import tkinter as tk
 from tkinter import filedialog
