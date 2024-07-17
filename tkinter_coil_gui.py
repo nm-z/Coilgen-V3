@@ -148,12 +148,16 @@ class CoilParameterGUI:
         coil = self.update_callback(self.params)  # Update the coil parameters based on GUI input
         loop_line_list = coil.render_loop_antenna()  # Generate the loop line list based on the current settings
 
-        # Check if the loop shape is one of the pad-enabled types
-        loop_with_pads = self.loop_shape_var.get() == 'Loop Antenna with Pads'
-        loop_with_pads_2_layer = self.loop_shape_var.get() == 'Loop Antenna with Pads 2 Layer'
+        # Determine the loop type based on the selected option
+        loop_shape = self.loop_shape_var.get()
+        loop_with_pads = loop_shape == 'Loop Antenna with Pads'
+        loop_with_pads_2_layer = loop_shape == 'Loop Antenna with Pads 2 Layer'
         
         # Pass the flags to the exporter to handle specific export logic for pads
-        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, 
+                                    loop_with_pads=loop_with_pads, 
+                                    loop_with_pads_2_layer=loop_with_pads_2_layer,
+                                    loop_shape=loop_shape)
 
 
 def main():
