@@ -42,15 +42,6 @@ class _shapeBaseClass:
     def __repr__(self): # prints the name of the shape
         return("shape("+(self.__class__.__name__)+")")
 
-# leave space here
-
-
-
-
-
-
-# leave space here
-
 
 def calcTraceSpacing(clearance: float, traceWidth: float) -> float:
     return clearance + traceWidth
@@ -465,6 +456,64 @@ class coilClass:
 
             return loop_lines + [trace1, trace2, pad1, pad2]
 
+        elif self.loop_shape == 'Loop Antenna with Pads 2 Layer':
+            loop_trace_width = 0.6096  # Fixed trace width for the loop in mm
+            gap = self.traceWidth  # Gap between the outer edge of the coil and the inner edge of the loop
+            pad_gap = 1.27  # Gap between pads
+           
+            center_offset = 0.8
+
+            loop_diameter = self.diam
+
+            print(f"Calculated Loop Diameter: {loop_diameter}")  # Debugging statement
+
+
+            # Calculate half the side of the square loop + the scale
+            half_side = (loop_diameter / 2) * center_offset
+
+
+            loop_lines = [
+                ((self.x_center - half_side, self.y_center - half_side),
+                (self.x_center + half_side, self.y_center - half_side)),
+                ((self.x_center + half_side, self.y_center - half_side),
+                (self.x_center + half_side, self.y_center + half_side)),
+                ((self.x_center + half_side, self.y_center + half_side),
+                (self.x_center - half_side, self.y_center + half_side)),
+                ((self.x_center - half_side, self.y_center + half_side),
+                (self.x_center - half_side, self.y_center - half_side))
+            ]
+
+            print(f"Loop Coordinates: {loop_lines}")  # Debugging statement
+
+
+            # Define pad sizes based on coil diameter
+            if self.diam <= 12:
+                pad_length, pad_width = 1.905, 1.5875
+            else:
+                pad_length, pad_width = 3.81, 3.175
+
+            # Position of pads (pointing downward and moved up by half a trace width)
+            pad_x1_center = self.x_center - (pad_gap/2 + pad_width/2) * center_offset
+            pad_x2_center = self.x_center + (pad_gap/2 + pad_width/2) * center_offset
+            pad_y_center = self.y_center + (half_side + pad_length/2 - loop_trace_width/2) * center_offset
+
+            pad1 = ((pad_x1_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x1_center + pad_width/2, pad_y_center + pad_length/2))
+            pad2 = ((pad_x2_center - pad_width/2, pad_y_center - pad_length/2),
+                    (pad_x2_center + pad_width/2, pad_y_center + pad_length/2))
+
+            # Add horizontal traces from loop corners to pads
+            trace1 = [
+                (self.x_center - half_side, self.y_center + half_side),
+                (pad_x1_center + pad_width/2, self.y_center + half_side)
+            ]
+            trace2 = [
+                (self.x_center + half_side, self.y_center + half_side),
+                (pad_x2_center - pad_width/2, self.y_center + half_side)
+            ]
+            return loop_lines + [trace1, trace2, pad1, pad2]
+
+
         elif self.loop_shape == 'circle':
             # Existing code for rendering circular loop antenna
             shape_instance = shapes[self.loop_shape]
@@ -533,6 +582,8 @@ def print_trace_lengths(coil, line_segments, already_printed):
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
+    print("Updating coil parameters...")  # Debugging statement to confirm function call
+
     turns = int(params["Turns"])
     diam = float(params["Diameter"])
     clearance = float(params["Width between traces"])
@@ -547,8 +598,8 @@ def update_coil_params(params):
     loop_diameter = float(params.get("loop_diameter", 0))
     loop_shape = params.get("loop_shape", "circle")
 
-    # Handle 'Loop Antenna with Pads' separately
-    if loop_shape == 'Loop Antenna with Pads':
+
+    if  loop_shape in ['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer']:
         coil_loop_shape = 'circle'  # Use circle as a default for the coil
     else:
         coil_loop_shape = loop_shape
@@ -576,11 +627,13 @@ def update_coil_params(params):
         renderedLineLists.append(loop_antenna_coords)
     else:
         renderedLineLists.append([])
+
     drawer.localVar = coil
     drawer.localVarUpdated = True
     drawer.debugText = drawer.makeDebugText(coil)
     drawer.lastFilename = coil.generateCoilFilename()
     updated = True  # Set the update flag to true after updating the coil parameters    
+    print("Update complete.")  # Debugging statement to confirm update completion
     return coil  # Ensure the coil object is returned
     
 # Am I synced git with VS ???

@@ -77,7 +77,7 @@ class CoilParameterGUI:
     def create_loop_widgets(self):
         self.loop_shape_var = tk.StringVar(value='Loop Antenna with Pads')
         self.loop_shape_label = tk.Label(self.loop_frame, text="Loop Antenna Shape")
-        self.loop_shape_combobox = ttk.Combobox(self.loop_frame, textvariable=self.loop_shape_var, values=['Loop Antenna with Pads', 'circle', 'square'], state='readonly')
+        self.loop_shape_combobox = ttk.Combobox(self.loop_frame, textvariable=self.loop_shape_var, values=['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer', 'circle', 'square'], state='readonly')
         self.loop_shape_combobox.grid(row=0, column=1, sticky='ew')
         self.loop_shape_label.grid(row=0, column=0, sticky='w')
 
@@ -110,23 +110,32 @@ class CoilParameterGUI:
         self.update_button.pack(side=tk.BOTTOM, pady=10)
 
     def submit(self):
-        self.params = {
-            "Turns": int(self.turns_entry.get()),
-            "Diameter": float(self.diameter_entry.get()),
-            "Width between traces": float(self.width_between_traces_entry.get()),
-            "Trace Width": float(self.trace_width_entry.get()),
-            "Layers": int(self.layers_entry.get()),
-            "PCB Thickness": float(self.pcb_thickness_entry.get()),
-            "Copper Thickness": float(self.copper_thickness_entry.get()),
-            "Shape": self.shape_var.get(),
-            "Formula": self.formula_var.get(),
-            "loop_enabled": True,
-            "loop_diameter": float(self.loop_diameter_entry.get()),
-            "loop_shape": self.loop_shape_var.get(),
-            "square_calc": self.square_calc_var.get()
-        }
-        coil = self.update_callback(self.params)
-        return coil
+        try:
+            self.params = {
+                "Turns": int(self.turns_entry.get()),
+                "Diameter": float(self.diameter_entry.get()),
+                "Width between traces": float(self.width_between_traces_entry.get()),
+                "Trace Width": float(self.trace_width_entry.get()),
+                "Layers": int(self.layers_entry.get()),
+                "PCB Thickness": float(self.pcb_thickness_entry.get()),
+                "Copper Thickness": float(self.copper_thickness_entry.get()),
+                "Shape": self.shape_var.get(),
+                "Formula": self.formula_var.get(),
+                "loop_enabled": True,
+                "loop_diameter": float(self.loop_diameter_entry.get()),
+                "loop_shape": self.loop_shape_var.get(),
+                "square_calc": self.square_calc_var.get()
+            }
+            coil = self.update_callback(self.params)
+
+            # Print to console
+
+
+            return coil
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid input: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
     def export_coil(self):
         self.submit()
@@ -135,11 +144,16 @@ class CoilParameterGUI:
         pcbnew_exporter.export_coil(coil, coil_line_list, self.export_options)
 
     def export_loop(self):
-        self.submit()
-        coil = self.update_callback(self.params)
-        loop_line_list = coil.render_loop_antenna()
+        self.submit()  # Collect all parameters from the GUI
+        coil = self.update_callback(self.params)  # Update the coil parameters based on GUI input
+        loop_line_list = coil.render_loop_antenna()  # Generate the loop line list based on the current settings
+
+        # Check if the loop shape is one of the pad-enabled types
         loop_with_pads = self.loop_shape_var.get() == 'Loop Antenna with Pads'
-        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, loop_with_pads=loop_with_pads)
+        loop_with_pads_2_layer = self.loop_shape_var.get() == 'Loop Antenna with Pads 2 Layer'
+        
+        # Pass the flags to the exporter to handle specific export logic for pads
+        pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
 
 
 def main():
