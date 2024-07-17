@@ -25,11 +25,11 @@ if not os.path.exists(TEMP_DIR):
 def generateCoilFilename(coil):
     return coil.generateCoilFilename()
 
-def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False):
+def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer):
+    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -44,15 +44,18 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
 
     # Add tracks based on which list is provided
     if loop_with_pads:
-        add_loop_antenna_with_pads(board, coil, offset)
+        if loop_with_pads_2_layer:
+            add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        else:
+            add_loop_antenna_with_pads(board, coil, offset)
     elif loop_line_list:
         for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
     elif coil_line_list:
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
-                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
@@ -94,8 +97,8 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
 
     print(f"SVG file(s) generated in {global_output_directory}")
 
-def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
-    generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads)
+def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
+    generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
 
 def generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=True):
     logging.debug("Generating Gerber files...")
@@ -169,13 +172,15 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loo
     print(f"Gerber file(s) generated in {global_output_directory}")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
-    generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+    # Ensure the same offset is used for both coil and loop antenna with pads
+    offset = (150, 100)
+    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
 
 def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer):
+    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -193,22 +198,25 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
         add_loop_antenna_with_pads(board, coil, offset)
     elif loop_line_list:
         for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
     elif coil_line_list:
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
-                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
     pcbnew.SaveBoard(temp_board_file, board)
 
-    # Plot to DXF
+    # Setup plot controller and options
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
 
-    plot_options.SetOutputDirectory(global_output_directory)
+    # Set DXF output units to millimeters
+    plot_options.SetDXFPlotUnits(pcbnew.DXF_UNITS_MILLIMETERS)
+
+    # Configure other plot options as needed
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
@@ -219,8 +227,8 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Set up the DXF plot
-    plot_options.SetFormat(pcbnew.PLOT_FORMAT_DXF)
+    # Set output directory and plot
+    plot_options.SetOutputDirectory(global_output_directory)
 
     # Generate unique filenames for coil and loop
     coil_filename = f"COIL_{coil.generateCoilFilename()}"
@@ -238,7 +246,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
         plot_controller.OpenPlotfile(loop_filename, pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
         plot_controller.PlotLayer()
 
-    # Finalize the plot
+    # Close plot file
     plot_controller.ClosePlot()
 
     print(f"DXF file(s) generated in {global_output_directory}")
@@ -250,7 +258,7 @@ def generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100)):
     # Initialize the board
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer):
+    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -266,12 +274,12 @@ def generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100)):
     # Add tracks based on which list is provided
     if loop_line_list:
         for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu)
+            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
     elif coil_line_list:
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
-                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu)
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
 
     # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
@@ -546,4 +554,4 @@ def export_loop(coil, loop_line_list, export_options, loop_with_pads=False, loop
                 elif option == 'DXF':
                     initialize_dxf_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads)
                 elif option == 'SVG':
-                    initialize_svg_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads)
+                    initialize_svg_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
