@@ -25,7 +25,7 @@ if not os.path.exists(TEMP_DIR):
 def generateCoilFilename(coil):
     return coil.generateCoilFilename()
 
-def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=False):
+def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
@@ -62,7 +62,7 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
 
-    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetOutputDirectory(global_output_directory)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
@@ -92,16 +92,12 @@ def generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"SVG file(s) generated in {output_directory}")
+    print(f"SVG file(s) generated in {global_output_directory}")
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    output_directory = filedialog.askdirectory(title="Select Output Directory")
-    if output_directory:
-        generate_svg(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=loop_with_pads)
+    generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads)
 
-def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=True):
+def generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=True):
     logging.debug("Generating Gerber files...")
     board = pcbnew.BOARD()
 
@@ -141,7 +137,7 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
 
-    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetOutputDirectory(global_output_directory)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
@@ -170,18 +166,12 @@ def generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offs
 
     # Finalize the plot
     plot_controller.ClosePlot()
-    print(f"Gerber file(s) generated in {output_directory}")
+    print(f"Gerber file(s) generated in {global_output_directory}")
 
-def initialize_gerber_generation(coil, coil_line_list, loop_line_list, output_directory, loop_with_pads=False, loop_with_pads_2_layer=False):
-    logging.debug(f"Initializing Gerber generation: loop_with_pads={loop_with_pads}, loop_with_pads_2_layer={loop_with_pads_2_layer}")
-    generate_gerber(coil, coil_line_list, loop_line_list, output_directory, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    output_directory = filedialog.askdirectory(title="Select Output Directory")
-    if output_directory:
-        generate_gerber(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
+    generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
 
-def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=False):
+def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
@@ -218,7 +208,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
 
-    plot_options.SetOutputDirectory(output_directory)
+    plot_options.SetOutputDirectory(global_output_directory)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
@@ -251,16 +241,12 @@ def generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=
     # Finalize the plot
     plot_controller.ClosePlot()
 
-    print(f"DXF file(s) generated in {output_directory}")
+    print(f"DXF file(s) generated in {global_output_directory}")
 
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    output_directory = filedialog.askdirectory(title="Select Output Directory")
-    if output_directory:
-        generate_dxf(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100), loop_with_pads=loop_with_pads)
+    generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads)
 
-def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100)):
+def generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100)):
     # Initialize the board
     board = pcbnew.BOARD()
 
@@ -303,21 +289,17 @@ def generate_drill(coil, coil_line_list, loop_line_list, output_directory, offse
 
     # Generate drill files
     if coil_line_list:
-        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-PTH.drl"))
-        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{coil_filename}-NPTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{coil_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{coil_filename}-NPTH.drl"))
 
     if loop_line_list:
-        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-PTH.drl"))
-        excellon_writer.CreateDrillFile(os.path.join(output_directory, f"{loop_filename}-NPTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{loop_filename}-PTH.drl"))
+        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{loop_filename}-NPTH.drl"))
 
-    print(f"Drill files generated in {output_directory}")
+    print(f"Drill files generated in {global_output_directory}")
 
 def initialize_drill_generation(coil, coil_line_list, loop_line_list):
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    output_directory = filedialog.askdirectory(title="Select Output Directory")
-    if output_directory:
-        generate_drill(coil, coil_line_list, loop_line_list, output_directory, offset=(150, 100))
+    generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100))
 
 def generate_loop_antenna_with_pads_2_layer(coil, offset=(150, 100), scale_factor=0.8):
     loop_trace_width = 0.6096  # mm
@@ -421,7 +403,6 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(150, 100), scale_fac
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 
-
 def generate_loop_antenna_with_pads(coil, offset=(150, 100)):
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
@@ -520,35 +501,49 @@ def add_loop_antenna_with_pads(board, coil, offset=(150, 100)):
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 
-
-
 def export_coil(coil, coil_line_list, export_options):
-    for option, var in export_options.items():
-        if var.get():
-            if option == 'SVG':
-                initialize_svg_generation(coil, coil_line_list, [])
-            elif option == 'Gerber':
-                initialize_gerber_generation(coil, coil_line_list, [])
-            elif option == 'DXF':
-                initialize_dxf_generation(coil, coil_line_list, [])
-            elif option == 'Drill':
-                initialize_drill_generation(coil, coil_line_list, [])
-
-def export_loop(coil, loop_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, loop_shape='circle'):
+    global global_output_directory
     root = tk.Tk()
     root.withdraw()  # Hide the root window
-    output_directory = filedialog.askdirectory(title="Select Output Directory")
+    global_output_directory = filedialog.askdirectory(title="Select Output Directory")
     root.destroy()
 
-    if output_directory:
+    if global_output_directory:
         for option, var in export_options.items():
             if var.get():
-                if loop_shape in ['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer']:
-                    initialize_gerber_generation(coil, [], loop_line_list, output_directory, 
-                                                 loop_with_pads=True, 
-                                                 loop_with_pads_2_layer=(loop_shape == 'Loop Antenna with Pads 2 Layer'))
-                else:
-                    initialize_gerber_generation(coil, [], loop_line_list, output_directory, 
-                                                 loop_with_pads=False, 
-                                                 loop_with_pads_2_layer=False)
+                if option == 'SVG':
+                    initialize_svg_generation(coil, coil_line_list, [])
+                elif option == 'Gerber':
+                    initialize_gerber_generation(coil, coil_line_list, [])
+                elif option == 'DXF':
+                    initialize_dxf_generation(coil, coil_line_list, [])
+                elif option == 'Drill':
+                    initialize_drill_generation(coil, coil_line_list, [])
 
+def export_loop(coil, loop_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, loop_shape='circle'):
+    global global_output_directory  # Declare the use of the global variable
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    global_output_directory = filedialog.askdirectory(title="Select Output Directory")  # Set the global variable
+    root.destroy()
+
+    # Determine pad settings based on loop_shape
+    if loop_shape == 'Loop Antenna with Pads':
+        loop_with_pads = True
+        loop_with_pads_2_layer = False
+    elif loop_shape == 'Loop Antenna with Pads 2 Layer':
+        loop_with_pads = True
+        loop_with_pads_2_layer = True
+    else:
+        loop_with_pads = False
+        loop_with_pads_2_layer = False
+
+    if global_output_directory:  # Check if the global variable is set
+        for option, var in export_options.items():
+            if var.get():
+                if option == 'Gerber':
+                    initialize_gerber_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+                elif option == 'DXF':
+                    initialize_dxf_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads)
+                elif option == 'SVG':
+                    initialize_svg_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads)
