@@ -22,6 +22,7 @@ TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
+
 def generateCoilFilename(coil):
     return coil.generateCoilFilename()
 
