@@ -22,12 +22,42 @@ TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
+global_output_directory = None
 
-def generateCoilFilename(coil):
-    return coil.generateCoilFilename()
+def set_output_directory():
+    global global_output_directory
+    if global_output_directory is None:
+        root = tk.Tk()
+        root.withdraw()
+        global_output_directory = filedialog.askdirectory(title="Select Output Directory")
+        root.destroy()
+    return global_output_directory
 
-def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False):
-    # Initialize the board
+def export_coil(coil, coil_line_list, export_options):
+    output_dir = set_output_directory()
+    if output_dir:
+        for option, var in export_options.items():
+            if var.get():
+                if option == 'SVG':
+                    generate_svg(coil, coil_line_list, [], combined=False)
+                elif option == 'Gerber':
+                    generate_gerber(coil, coil_line_list, [], combined=False)
+                elif option == 'DXF':
+                    generate_dxf(coil, coil_line_list, [], combined=False)
+
+def export_loop(coil, coil_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+    output_dir = set_output_directory()
+    if output_dir:
+        for option, var in export_options.items():
+            if var.get():
+                if option == 'SVG':
+                    generate_svg(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+                elif option == 'Gerber':
+                    generate_gerber(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+                elif option == 'DXF':
+                    generate_dxf(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+
+def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
@@ -43,29 +73,34 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add tracks based on which list is provided
-    if loop_with_pads:
-        if loop_with_pads_2_layer:
-            add_loop_antenna_with_pads_2_layer(board, coil, offset)
-        else:
-            add_loop_antenna_with_pads(board, coil, offset)
-    elif loop_line_list:
-        for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-    elif coil_line_list:
+    if combined:
+        # Add coil to board
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        # Add loop with pads
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"COMBINED_{coil.generateCoilFilename()}"
+    elif loop_with_pads:
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"LOOP_{coil.generateCoilFilename()}"
+    elif loop_with_pads_2_layer:
+        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
+    else:
+        # Add coil to board
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        filename = f"COIL_{coil.generateCoilFilename()}"
 
-    # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
     pcbnew.SaveBoard(temp_board_file, board)
 
-    # Plot to SVG
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
-
     plot_options.SetOutputDirectory(global_output_directory)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
@@ -77,32 +112,31 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Generate unique filenames for coil and loop
-    coil_filename = f"COIL_{coil.generateCoilFilename()}"
-    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
-
-    # Plot the F.Cu (Front Copper) layer
-    if coil_line_list:
+    if combined:
         plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile(coil_filename, pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_SVG, "Combined Coil and Loop")
         plot_controller.PlotLayer()
-
-    # Plot the B.Cu (Back Copper) layer if loop antenna exists
-    if loop_with_pads or loop_line_list:
+    elif loop_with_pads:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile(loop_filename, pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.PlotLayer()
+    elif loop_with_pads_2_layer:
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_SVG, "Generated Loop")
+        plot_controller.PlotLayer()
+    else:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_SVG, "Generated Coil")
         plot_controller.PlotLayer()
 
-    # Finalize the plot
     plot_controller.ClosePlot()
 
     print(f"SVG file(s) generated in {global_output_directory}")
 
-def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
-    generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+    generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
 
-def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=True):
-    logging.debug("Generating Gerber files...")
+def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
@@ -118,29 +152,34 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add tracks based on which list is provided
-    if loop_with_pads:
-        if loop_with_pads_2_layer:
-            add_loop_antenna_with_pads_2_layer(board, coil, offset)  # Assuming this function is defined to handle 2-layer pads
-        else:
-            add_loop_antenna_with_pads(board, coil, offset)
-    elif loop_line_list:
-        for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-    elif coil_line_list:
+    if combined:
+        # Add coil to board
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        # Add loop with pads
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"COMBINED_{coil.generateCoilFilename()}"
+    elif loop_with_pads:
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"LOOP_{coil.generateCoilFilename()}"
+    elif loop_with_pads_2_layer:
+        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
+    else:
+        # Add coil to board
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        filename = f"COIL_{coil.generateCoilFilename()}"
 
-    # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
     pcbnew.SaveBoard(temp_board_file, board)
 
-    # Plot to Gerber
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
-
     plot_options.SetOutputDirectory(global_output_directory)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
@@ -152,36 +191,36 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
-    # Generate unique filenames for coil and loop
-    coil_filename = f"COIL_{coil.generateCoilFilename()}"
-    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
-
-    # Plot the F.Cu (Front Copper) layer to Gerber
-    if coil_line_list:
+    if combined:
         plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile(f"{coil_filename}_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Coil Front Copper Layer")
+        plot_controller.OpenPlotfile(f"{filename}_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Combined Coil and Loop")
         plot_controller.PlotLayer()
-
-    # Plot the B.Cu (Back Copper) layer to Gerber if loop antenna exists
-    if loop_with_pads or loop_line_list:
+    elif loop_with_pads:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile(f"{loop_filename}_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
+        plot_controller.OpenPlotfile(f"{filename}_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
+        plot_controller.PlotLayer()
+    elif loop_with_pads_2_layer:
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile(f"{filename}_B_Cu", pcbnew.PLOT_FORMAT_GERBER, "Loop Back Copper Layer")
+        plot_controller.PlotLayer()
+    else:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(f"{filename}_F_Cu", pcbnew.PLOT_FORMAT_GERBER, "Coil Front Copper Layer")
         plot_controller.PlotLayer()
 
-    # Finalize the plot
     plot_controller.ClosePlot()
     print(f"Gerber file(s) generated in {global_output_directory}")
 
-def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
+def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
     # Set different offsets based on the loop type
     if loop_with_pads_2_layer:
         offset = (0, 0)  # Specific offset for Loop with Pads 2 Layer
     else:
         offset = (0, 0)  # Default offset for other types
 
-    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
-def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False):
-    # Initialize the board
+    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+
+def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
@@ -197,30 +236,35 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
-    # Add tracks based on which list is provided
-    if loop_with_pads:
-        add_loop_antenna_with_pads(board, coil, offset)
-    elif loop_line_list:
-        for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-    elif coil_line_list:
+    if combined:
+        # Add coil to board
         for line in coil_line_list:
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        # Add loop with pads
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"COMBINED_{coil.generateCoilFilename()}"
+    elif loop_with_pads:
+        add_loop_antenna_with_pads(board, coil, offset)
+        filename = f"LOOP_{coil.generateCoilFilename()}"
+    elif loop_with_pads_2_layer:
+        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
+    else:
+        # Add coil to board
+        for line in coil_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
+        filename = f"COIL_{coil.generateCoilFilename()}"
 
-    # Save the board to a temporary file in the Temp directory
     temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
     pcbnew.SaveBoard(temp_board_file, board)
 
-    # Setup plot controller and options
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
-
-    # Set DXF output units to millimeters
     plot_options.SetDXFPlotUnits(pcbnew.DXF_UNITS_MILLIMETERS)
-
-    # Configure other plot options as needed
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
@@ -230,24 +274,23 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
     plot_options.SetPlotViaOnMaskLayer(False)
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
-
-    # Set output directory and plot
     plot_options.SetOutputDirectory(global_output_directory)
 
-    # Generate unique filenames for coil and loop
-    coil_filename = f"COIL_{coil.generateCoilFilename()}"
-    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
-
-    # Plot the F.Cu (Front Copper) layer
-    if coil_line_list:
+    if combined:
         plot_controller.SetLayer(pcbnew.F_Cu)
-        plot_controller.OpenPlotfile(coil_filename, pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_DXF, "Combined Coil and Loop")
         plot_controller.PlotLayer()
-
-    # Plot the B.Cu (Back Copper) layer if loop antenna exists
-    if loop_with_pads or loop_line_list:
+    elif loop_with_pads:
         plot_controller.SetLayer(pcbnew.B_Cu)
-        plot_controller.OpenPlotfile(loop_filename, pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
+        plot_controller.PlotLayer()
+    elif loop_with_pads_2_layer:
+        plot_controller.SetLayer(pcbnew.B_Cu)
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_DXF, "Generated Loop")
+        plot_controller.PlotLayer()
+    else:
+        plot_controller.SetLayer(pcbnew.F_Cu)
+        plot_controller.OpenPlotfile(filename, pcbnew.PLOT_FORMAT_DXF, "Generated Coil")
         plot_controller.PlotLayer()
 
     # Close plot file
@@ -255,8 +298,8 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
 
     print(f"DXF file(s) generated in {global_output_directory}")
 
-def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
-    generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads)
+def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, combined=False):
+    generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, combined=combined)
 
 def generate_drill(coil, coil_line_list, loop_line_list, offset=(0, 0)):
     # Initialize the board
@@ -513,49 +556,3 @@ def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 
-def export_coil(coil, coil_line_list, export_options):
-    global global_output_directory
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    global_output_directory = filedialog.askdirectory(title="Select Output Directory")
-    root.destroy()
-
-    if global_output_directory:
-        for option, var in export_options.items():
-            if var.get():
-                if option == 'SVG':
-                    initialize_svg_generation(coil, coil_line_list, [])
-                elif option == 'Gerber':
-                    initialize_gerber_generation(coil, coil_line_list, [])
-                elif option == 'DXF':
-                    initialize_dxf_generation(coil, coil_line_list, [])
-                elif option == 'Drill':
-                    initialize_drill_generation(coil, coil_line_list, [])
-
-def export_loop(coil, loop_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, loop_shape='circle'):
-    global global_output_directory  # Declare the use of the global variable
-    root = tk.Tk()
-    root.withdraw()  # Hide the root window
-    global_output_directory = filedialog.askdirectory(title="Select Output Directory")  # Set the global variable
-    root.destroy()
-
-    # Determine pad settings based on loop_shape
-    if loop_shape == 'Loop Antenna with Pads':
-        loop_with_pads = True
-        loop_with_pads_2_layer = False
-    elif loop_shape == 'Loop Antenna with Pads 2 Layer':
-        loop_with_pads = True
-        loop_with_pads_2_layer = True
-    else:
-        loop_with_pads = False
-        loop_with_pads_2_layer = False
-
-    if global_output_directory:  # Check if the global variable is set
-        for option, var in export_options.items():
-            if var.get():
-                if option == 'Gerber':
-                    initialize_gerber_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
-                elif option == 'DXF':
-                    initialize_dxf_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads)
-                elif option == 'SVG':
-                    initialize_svg_generation(coil, [], loop_line_list, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)

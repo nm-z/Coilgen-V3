@@ -128,32 +128,43 @@ class CoilParameterGUI:
             messagebox.showerror("Error", f"An error occurred: {e}")
 
     def export(self):
-        if self.export_coil_var.get():
-            self.export_coil()
-        if self.export_loop_var.get():
-            self.export_loop()
-
-    def export_coil(self):
-        if self.submit():
-            coil = self.update_callback(self.params)
-            coil_line_list = coil.renderAsCoordinateList()
-            pcbnew_exporter.export_coil(coil, coil_line_list, self.export_options)
-
-    def export_loop(self):
-        if self.submit():
-            coil = self.update_callback(self.params)
-            loop_line_list = coil.render_loop_antenna()
-
-            # Determine the loop type based on the selected option
+        coil = self.submit()
+        if coil:
             loop_shape = self.loop_shape_var.get()
             loop_with_pads = loop_shape == 'Loop Antenna with Pads'
             loop_with_pads_2_layer = loop_shape == 'Loop Antenna with Pads 2 Layer'
             
-            # Pass the flags to the exporter to handle specific export logic for pads
-            pcbnew_exporter.export_loop(coil, loop_line_list, self.export_options, 
-                                        loop_with_pads=loop_with_pads, 
-                                        loop_with_pads_2_layer=loop_with_pads_2_layer,
-                                        loop_shape=loop_shape)
+            export_coil = self.export_coil_var.get()
+            export_loop = self.export_loop_var.get()
+            
+            try:
+                if loop_with_pads:
+                    if export_coil and not export_loop:
+                        # Only export coil
+                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+                    elif not export_coil and export_loop:
+                        # Only export loop_with_pads
+                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads=True, combined=False)
+                    elif export_coil and export_loop:
+                        # Combined export (loop_with_pads and coil)
+                        pcbnew_exporter.export_loop(coil, coil.renderAsCoordinateList(), self.export_options, loop_with_pads=True, combined=True)
+                elif loop_with_pads_2_layer:
+                    if export_coil:
+                        # Only export coil
+                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+                    if export_loop:
+                        # Only export loop_with_pads_2_layer
+                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads_2_layer=True, combined=False)
+                    if export_coil and export_loop:
+                        # Export coil and loop_with_pads_2_layer separately
+                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads_2_layer=True, combined=False)
+                else:
+                    if export_coil:
+                        # Only export coil
+                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+            except Exception as e:
+                messagebox.showerror("Export Error", f"An error occurred during export: {str(e)}")
 
 
 def main():
