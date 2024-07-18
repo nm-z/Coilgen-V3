@@ -26,11 +26,11 @@ if not os.path.exists(TEMP_DIR):
 def generateCoilFilename(coil):
     return coil.generateCoilFilename()
 
-def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=False):
+def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
+    def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -99,13 +99,13 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
     print(f"SVG file(s) generated in {global_output_directory}")
 
 def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
-    generate_svg(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+    generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
 
-def generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False, loop_with_pads_2_layer=True):
+def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=True):
     logging.debug("Generating Gerber files...")
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
+    def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -173,11 +173,14 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(150, 100), loo
     print(f"Gerber file(s) generated in {global_output_directory}")
 
 def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False):
-    # Ensure the same offset is used for both coil and loop antenna with pads
-    offset = (150, 100)
-    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+    # Set different offsets based on the loop type
+    if loop_with_pads_2_layer:
+        offset = (0, 0)  # Specific offset for Loop with Pads 2 Layer
+    else:
+        offset = (0, 0)  # Default offset for other types
 
-def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=False):
+    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer)
+def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False):
     # Initialize the board
     board = pcbnew.BOARD()
 
@@ -253,13 +256,13 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_w
     print(f"DXF file(s) generated in {global_output_directory}")
 
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False):
-    generate_dxf(coil, coil_line_list, loop_line_list, offset=(150, 100), loop_with_pads=loop_with_pads)
+    generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads)
 
-def generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100)):
+def generate_drill(coil, coil_line_list, loop_line_list, offset=(0, 0)):
     # Initialize the board
     board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
+    def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
         if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
             start_flipped = (start[0], -start[1])
             end_flipped = (end[0], -end[1])
@@ -308,12 +311,12 @@ def generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100)):
     print(f"Drill files generated in {global_output_directory}")
 
 def initialize_drill_generation(coil, coil_line_list, loop_line_list):
-    generate_drill(coil, coil_line_list, loop_line_list, offset=(150, 100))
+    generate_drill(coil, coil_line_list, loop_line_list, offset=(0, 0))
 
-def generate_loop_antenna_with_pads_2_layer(coil, offset=(150, 100), scale_factor=0.8):
+def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.9):
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
-    scale_factor=0.8
+    scale_factor=0.9
     print(f"Received coil diameter: {coil_diameter}")
 
     # Apply scaling to the coil's diameter to calculate the loop's diameter
@@ -358,9 +361,9 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(150, 100), scale_facto
         'pad_gap': pad_gap
     }
 
-def add_loop_antenna_with_pads_2_layer(board, coil, offset=(150, 100), scale_factor=0.8):
+def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=0.9):
     loop_data = generate_loop_antenna_with_pads_2_layer(coil, offset, scale_factor)
-    scale_factor = 0.8
+    scale_factor = 0.9
     # Scale loop points directly
     loop_points = [
         (loop_data['loop'][0][0] * scale_factor, loop_data['loop'][0][1] * scale_factor),  # Top-left
@@ -412,7 +415,7 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(150, 100), scale_fac
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 
-def generate_loop_antenna_with_pads(coil, offset=(150, 100)):
+def generate_loop_antenna_with_pads(coil, offset=(0, 0)):
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
     coil_trace_width = float(coil.traceWidth)
@@ -456,7 +459,7 @@ def generate_loop_antenna_with_pads(coil, offset=(150, 100)):
         'pad_gap': pad_gap
     }
 
-def add_loop_antenna_with_pads(board, coil, offset=(150, 100)):
+def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
     loop_data = generate_loop_antenna_with_pads(coil, offset)
     
     # Add C-shaped loop (top, left, right)
