@@ -280,7 +280,7 @@ def generateCoilFilename(coil: 'coilClass') -> str:
 class coilClass:
     def __init__(self, turns, diam, clearance, traceWidth, layers=1, PCBthickness=1.6, copperThickness=0.035, shape='circle', formula='cur_sheet', CCW=False, loop_enabled=False, loop_diameter=0.0, loop_shape='circle', calcPos=None, calcLength=None):
         self.turns = turns
-        self.diam = diam
+        self.diam = diam - (traceWidth)
         self.clearance = clearance
         self.traceWidth = traceWidth
         self.layers = layers

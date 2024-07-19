@@ -15,10 +15,10 @@ class CoilParameterGUI:
         self.shapes = ['square', 'hexagon', 'octagon', 'circle']
         self.formulas = ['cur_sheet', 'monomial', 'wheeler']
         self.defaults = {
-            "Turns": 4,
-            "Diameter": 10,
-            "Width between traces": 0.5,
-            "Trace Width": 0.5,
+            "Turns": 20,
+            "Diameter": 120,
+            "Width between traces": 0.61,
+            "Trace Width": 0.61,
             "Layers": 1,
             "PCB Thickness": 0.6,
             "Copper Thickness": 0.035
@@ -27,7 +27,7 @@ class CoilParameterGUI:
         # Initialize the variables for comboboxes
         self.shape_var = tk.StringVar(value=self.shapes[0])  # Default to the first shape
         self.formula_var = tk.StringVar(value=self.formulas[0])  # Default to the first formula
-        self.loop_shape_var = tk.StringVar(value='Loop Antenna with Pads')  # Default loop shape
+        self.loop_shape_var = tk.StringVar(value='Loop Antenna with Pads 2 Layer')  # Default loop shape
         self.square_calc_var = tk.BooleanVar(value=False)  # Assuming it's a boolean, adjust as necessary
 
         self.create_parameters_section()
@@ -93,8 +93,8 @@ class CoilParameterGUI:
 
         # Type Subsection
         ttk.Label(self.main_frame, text="Type", font=('TkDefaultFont', 10, 'bold')).grid(row=21, column=1, sticky='w')
-        self.export_coil_var = tk.BooleanVar(value=False)
-        self.export_loop_var = tk.BooleanVar(value=False)
+        self.export_coil_var = tk.BooleanVar(value=True)
+        self.export_loop_var = tk.BooleanVar(value=True)
         tk.Checkbutton(self.main_frame, text="Export Coil", variable=self.export_coil_var).grid(row=22, column=1, padx=5, pady=5, sticky='w')
         tk.Checkbutton(self.main_frame, text="Export Loop", variable=self.export_loop_var).grid(row=23, column=1, padx=5, pady=5, sticky='w')
 

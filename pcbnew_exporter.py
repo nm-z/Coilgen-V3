@@ -492,15 +492,23 @@ def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pa
 
 
 
-def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.9):
+def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.8000):
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
-    scale_factor=0.9
+    coil_trace_width = float(coil.traceWidth)    
+    print(f"CoilDiameter according to generate_loop_antenna_with_pads_2_layer : {coil_diameter}")
+    scale_factor=0.8000
     print(f"Received coil diameter: {coil_diameter}")
 
-    # Apply scaling to the coil's diameter to calculate the loop's diameter
-    loop_diameter = scale_factor * coil_diameter
-    print(f"Calculated Loop Diameter with Pads 2 Layer: {loop_diameter} mm")
+    actual_coil_diam = coil_diameter + coil_trace_width 
+
+#     loop_diameter = actual_coil_diam * scale_factor
+
+    # Adjusted calculation to make actual_loop_diam equal to 80% of coil_diam_adjusted
+    loop_diameter = (actual_coil_diam * scale_factor) - loop_trace_width
+
+
+
 
     # Calculate pad dimensions based on the scaled loop diameter
     if loop_diameter <= 12:
@@ -511,7 +519,7 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
     pad_gap = 1.27  # mm, space between pads
 
     # Calculate loop coordinates based on the scaled loop diameter
-    half_loop_size = (loop_diameter / 2) * scale_factor 
+    half_loop_size = loop_diameter / 2
     loop_coords = [
         (-half_loop_size, -half_loop_size),
         (half_loop_size, -half_loop_size),
@@ -529,6 +537,12 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
     pad_left_center = (pad_left_x + offset[0], pad_y + offset[1])
     pad_right_center = (pad_right_x + offset[0], pad_y + offset[1])
 
+    print(f"Calculated Loop Diameter with Pads 2 Layer: {loop_diameter} mm")
+
+
+
+
+
     return {
         'loop': loop_coords,
         'loop_trace_width': loop_trace_width,
@@ -540,23 +554,18 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
         'pad_gap': pad_gap
     }
 
-def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=0.9):
+def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=0.8000):
     loop_data = generate_loop_antenna_with_pads_2_layer(coil, offset, scale_factor)
-    scale_factor = 0.9
-    # Scale loop points directly
-    loop_points = [
-        (loop_data['loop'][0][0] * scale_factor, loop_data['loop'][0][1] * scale_factor),  # Top-left
-        (loop_data['loop'][1][0] * scale_factor, loop_data['loop'][1][1] * scale_factor),  # Top-right
-        (loop_data['loop'][2][0] * scale_factor, loop_data['loop'][2][1] * scale_factor),  # Bottom-right
-        (loop_data['loop'][3][0] * scale_factor, loop_data['loop'][3][1] * scale_factor)   # Bottom-left
-    ]
+    
+    # Use loop points directly without additional scaling
+    loop_points = loop_data['loop']
     
     # Create top, left, and right sides
     for i in [0, 3, 1]:
         track = pcbnew.PCB_TRACK(board)
         track.SetStart(pcbnew.VECTOR2I(int(loop_points[i][0] * 1e6), int(loop_points[i][1] * 1e6)))
         track.SetEnd(pcbnew.VECTOR2I(int(loop_points[(i+1)%4][0] * 1e6), int(loop_points[(i+1)%4][1] * 1e6)))
-        track.SetWidth(int(loop_data['loop_trace_width'] * 1e6 * scale_factor))
+        track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
     
@@ -564,16 +573,16 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=
     dummy_module = pcbnew.FOOTPRINT(board)
     board.Add(dummy_module)
     
-    # Calculate pad positions, scaled by the scale factor
-    pad_gap = 1.27 * scale_factor  # mm, space between pads
-    pad_y = loop_points[2][1] + loop_data['pad_length'] * scale_factor / 2 - loop_data['loop_trace_width'] * scale_factor / 2
-    pad_left_x = loop_points[3][0] + (loop_points[2][0] - loop_points[3][0] - pad_gap) / 2 - loop_data['pad_width'] * scale_factor / 2
-    pad_right_x = pad_left_x + loop_data['pad_width'] * scale_factor + pad_gap
+    # Calculate pad positions
+    pad_gap = loop_data['pad_gap']
+    pad_y = loop_points[2][1] + loop_data['pad_length'] / 2 - loop_data['loop_trace_width'] / 2
+    pad_left_x = loop_points[3][0] + (loop_points[2][0] - loop_points[3][0] - pad_gap) / 2 - loop_data['pad_width'] / 2
+    pad_right_x = pad_left_x + loop_data['pad_width'] + pad_gap
     
     # Add pads and connect them to the loop
     for i, pad_x in enumerate([pad_left_x, pad_right_x]):
         pad = pcbnew.PAD(dummy_module)
-        pad.SetSize(pcbnew.VECTOR2I(int(loop_data['pad_width'] * 1e6 * scale_factor), int(loop_data['pad_length'] * 1e6 * scale_factor)))
+        pad.SetSize(pcbnew.VECTOR2I(int(loop_data['pad_width'] * 1e6), int(loop_data['pad_length'] * 1e6)))
         pad.SetShape(pcbnew.PAD_SHAPE_RECT)
         pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
         pad.SetPosition(pad_position)
@@ -586,11 +595,11 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=
         track.SetStart(pcbnew.VECTOR2I(int(corner_x * 1e6), int(loop_points[2][1] * 1e6)))
         
         # Calculate the end point of the trace to cover the entire width of the pad
-        trace_end_x = pad_x - loop_data['pad_width'] * scale_factor / 2 if i == 0 else pad_x + loop_data['pad_width'] * scale_factor / 2
+        trace_end_x = pad_x - loop_data['pad_width'] / 2 if i == 0 else pad_x + loop_data['pad_width'] / 2
         trace_end_y = loop_points[2][1]  # Keep the same y-coordinate as the loop corner
         
         track.SetEnd(pcbnew.VECTOR2I(int(trace_end_x * 1e6), int(trace_end_y * 1e6)))
-        track.SetWidth(int(loop_data['loop_trace_width'] * 1e6 * scale_factor))
+        track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 
