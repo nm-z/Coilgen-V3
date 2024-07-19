@@ -80,12 +80,73 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         # Add loop with pads
-        add_loop_antenna_with_pads(board, coil, offset)
+        loop_data = generate_loop_antenna_with_pads(coil, offset)
+        
+        # Add C-shaped loop (top, left, right)
+        loop_points = [
+            (loop_data['loop'][0][0], loop_data['loop'][0][1]),  # Top-left
+            (loop_data['loop'][1][0], loop_data['loop'][1][1]),  # Top-right
+            (loop_data['loop'][2][0], loop_data['loop'][2][1]),  # Bottom-right
+            (loop_data['loop'][3][0], loop_data['loop'][3][1])   # Bottom-left
+        ]
+        
+        # Create top, left, and right sides
+        for i in [0, 3, 1]:
+            track = pcbnew.PCB_TRACK(board)
+            track.SetStart(pcbnew.VECTOR2I(int(loop_points[i][0] * 1e6), int(loop_points[i][1] * 1e6)))
+            track.SetEnd(pcbnew.VECTOR2I(int(loop_points[(i+1)%4][0] * 1e6), int(loop_points[(i+1)%4][1] * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
+        # Create a dummy footprint to host the pads
+        dummy_module = pcbnew.FOOTPRINT(board)
+        board.Add(dummy_module)
+
+        # Calculate pad positions
+        pad_gap = loop_data['pad_gap']
+        pad_y = loop_points[2][1] + loop_data['pad_length'] / 2 - loop_data['loop_trace_width'] / 2
+        pad_left_x = loop_points[3][0] + (loop_points[2][0] - loop_points[3][0] - pad_gap) / 2 - loop_data['pad_width'] / 2
+        pad_right_x = pad_left_x + loop_data['pad_width'] + pad_gap
+
+        # Add pads and connect them to the loop
+        for i, pad_x in enumerate([pad_left_x, pad_right_x]):
+            pad = pcbnew.PAD(dummy_module)
+            pad.SetSize(pcbnew.VECTOR2I(int(loop_data['pad_width'] * 1e6), int(loop_data['pad_length'] * 1e6)))
+            pad.SetShape(pcbnew.PAD_SHAPE_RECT)
+            pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
+            pad.SetPosition(pad_position)
+            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            dummy_module.Add(pad)
+
+            # Add trace connecting loop corner to pad
+            track = pcbnew.PCB_TRACK(board)
+            corner_x = loop_points[3][0] if i == 0 else loop_points[2][0]
+            track.SetStart(pcbnew.VECTOR2I(int(corner_x * 1e6), int(loop_points[2][1] * 1e6)))
+
+            # Calculate the end point of the trace to cover the entire width of the pad
+            trace_end_x = pad_x - loop_data['pad_width']/2 if i == 0 else pad_x + loop_data['pad_width']/2
+            trace_end_y = loop_points[2][1]  # Keep the same y-coordinate as the loop corner
+            
+            track.SetEnd(pcbnew.VECTOR2I(int(trace_end_x * 1e6), int(trace_end_y * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
         filename = f"COMBINED_{coil.generateCoilFilename()}"
+
     elif loop_with_pads:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         add_loop_antenna_with_pads(board, coil, offset)
         filename = f"LOOP_{coil.generateCoilFilename()}"
     elif loop_with_pads_2_layer:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
         add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
@@ -152,6 +213,9 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
         else:
             print(f"Invalid coordinates: start={start}, end={end}")
 
+
+
+
     if combined:
         # Add coil to board
         for line in coil_line_list:
@@ -159,12 +223,76 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         # Add loop with pads
-        add_loop_antenna_with_pads(board, coil, offset)
+        loop_data = generate_loop_antenna_with_pads(coil, offset)
+        
+        # Add C-shaped loop (top, left, right)
+        loop_points = [
+            (loop_data['loop'][0][0], loop_data['loop'][0][1]),  # Top-left
+            (loop_data['loop'][1][0], loop_data['loop'][1][1]),  # Top-right
+            (loop_data['loop'][2][0], loop_data['loop'][2][1]),  # Bottom-right
+            (loop_data['loop'][3][0], loop_data['loop'][3][1])   # Bottom-left
+        ]
+        
+        # Create top, left, and right sides
+        for i in [0, 3, 1]:
+            track = pcbnew.PCB_TRACK(board)
+            track.SetStart(pcbnew.VECTOR2I(int(loop_points[i][0] * 1e6), int(loop_points[i][1] * 1e6)))
+            track.SetEnd(pcbnew.VECTOR2I(int(loop_points[(i+1)%4][0] * 1e6), int(loop_points[(i+1)%4][1] * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
+        # Create a dummy footprint to host the pads
+        dummy_module = pcbnew.FOOTPRINT(board)
+        board.Add(dummy_module)
+
+        # Calculate pad positions
+        pad_gap = loop_data['pad_gap']
+        pad_y = loop_points[2][1] + loop_data['pad_length'] / 2 - loop_data['loop_trace_width'] / 2
+        pad_left_x = loop_points[3][0] + (loop_points[2][0] - loop_points[3][0] - pad_gap) / 2 - loop_data['pad_width'] / 2
+        pad_right_x = pad_left_x + loop_data['pad_width'] + pad_gap
+
+        # Add pads and connect them to the loop
+        for i, pad_x in enumerate([pad_left_x, pad_right_x]):
+            pad = pcbnew.PAD(dummy_module)
+            pad.SetSize(pcbnew.VECTOR2I(int(loop_data['pad_width'] * 1e6), int(loop_data['pad_length'] * 1e6)))
+            pad.SetShape(pcbnew.PAD_SHAPE_RECT)
+            pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
+            pad.SetPosition(pad_position)
+            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            dummy_module.Add(pad)
+
+            # Add trace connecting loop corner to pad
+            track = pcbnew.PCB_TRACK(board)
+            corner_x = loop_points[3][0] if i == 0 else loop_points[2][0]
+            track.SetStart(pcbnew.VECTOR2I(int(corner_x * 1e6), int(loop_points[2][1] * 1e6)))
+
+            # Calculate the end point of the trace to cover the entire width of the pad
+            trace_end_x = pad_x - loop_data['pad_width']/2 if i == 0 else pad_x + loop_data['pad_width']/2
+            trace_end_y = loop_points[2][1]  # Keep the same y-coordinate as the loop corner
+            
+            track.SetEnd(pcbnew.VECTOR2I(int(trace_end_x * 1e6), int(trace_end_y * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
         filename = f"COMBINED_{coil.generateCoilFilename()}"
+
+
+
+
     elif loop_with_pads:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         add_loop_antenna_with_pads(board, coil, offset)
         filename = f"LOOP_{coil.generateCoilFilename()}"
     elif loop_with_pads_2_layer:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
         add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
@@ -243,12 +371,73 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         # Add loop with pads
-        add_loop_antenna_with_pads(board, coil, offset)
+        loop_data = generate_loop_antenna_with_pads(coil, offset)
+        
+        # Add C-shaped loop (top, left, right)
+        loop_points = [
+            (loop_data['loop'][0][0], loop_data['loop'][0][1]),  # Top-left
+            (loop_data['loop'][1][0], loop_data['loop'][1][1]),  # Top-right
+            (loop_data['loop'][2][0], loop_data['loop'][2][1]),  # Bottom-right
+            (loop_data['loop'][3][0], loop_data['loop'][3][1])   # Bottom-left
+        ]
+        
+        # Create top, left, and right sides
+        for i in [0, 3, 1]:
+            track = pcbnew.PCB_TRACK(board)
+            track.SetStart(pcbnew.VECTOR2I(int(loop_points[i][0] * 1e6), int(loop_points[i][1] * 1e6)))
+            track.SetEnd(pcbnew.VECTOR2I(int(loop_points[(i+1)%4][0] * 1e6), int(loop_points[(i+1)%4][1] * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
+        # Create a dummy footprint to host the pads
+        dummy_module = pcbnew.FOOTPRINT(board)
+        board.Add(dummy_module)
+
+        # Calculate pad positions
+        pad_gap = loop_data['pad_gap']
+        pad_y = loop_points[2][1] + loop_data['pad_length'] / 2 - loop_data['loop_trace_width'] / 2
+        pad_left_x = loop_points[3][0] + (loop_points[2][0] - loop_points[3][0] - pad_gap) / 2 - loop_data['pad_width'] / 2
+        pad_right_x = pad_left_x + loop_data['pad_width'] + pad_gap
+
+        # Add pads and connect them to the loop
+        for i, pad_x in enumerate([pad_left_x, pad_right_x]):
+            pad = pcbnew.PAD(dummy_module)
+            pad.SetSize(pcbnew.VECTOR2I(int(loop_data['pad_width'] * 1e6), int(loop_data['pad_length'] * 1e6)))
+            pad.SetShape(pcbnew.PAD_SHAPE_RECT)
+            pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
+            pad.SetPosition(pad_position)
+            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            dummy_module.Add(pad)
+
+            # Add trace connecting loop corner to pad
+            track = pcbnew.PCB_TRACK(board)
+            corner_x = loop_points[3][0] if i == 0 else loop_points[2][0]
+            track.SetStart(pcbnew.VECTOR2I(int(corner_x * 1e6), int(loop_points[2][1] * 1e6)))
+
+            # Calculate the end point of the trace to cover the entire width of the pad
+            trace_end_x = pad_x - loop_data['pad_width']/2 if i == 0 else pad_x + loop_data['pad_width']/2
+            trace_end_y = loop_points[2][1]  # Keep the same y-coordinate as the loop corner
+            
+            track.SetEnd(pcbnew.VECTOR2I(int(trace_end_x * 1e6), int(trace_end_y * 1e6)))
+            track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
+            track.SetLayer(pcbnew.F_Cu)
+            board.Add(track)
+
         filename = f"COMBINED_{coil.generateCoilFilename()}"
+
     elif loop_with_pads:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
         add_loop_antenna_with_pads(board, coil, offset)
         filename = f"LOOP_{coil.generateCoilFilename()}"
     elif loop_with_pads_2_layer:
+        for line in loop_line_list:
+            if len(line) == 2:
+                start, end = line
+                add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
         add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
@@ -301,60 +490,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
 def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, combined=False):
     generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, combined=combined)
 
-def generate_drill(coil, coil_line_list, loop_line_list, offset=(0, 0)):
-    # Initialize the board
-    board = pcbnew.BOARD()
 
-    def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
-        if isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)):
-            start_flipped = (start[0], -start[1])
-            end_flipped = (end[0], -end[1])
-            track = pcbnew.PCB_TRACK(board)
-            track.SetWidth(int(traceWidth * 1e6))  # Convert mm to nm
-            track.SetStart(pcbnew.VECTOR2I(int((start_flipped[0] + offset[0]) * 1e6), int((start_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetEnd(pcbnew.VECTOR2I(int((end_flipped[0] + offset[0]) * 1e6), int((end_flipped[1] + offset[1]) * 1e6)))  # Apply offset and convert mm to nm
-            track.SetLayer(layer)
-            board.Add(track)
-        else:
-            print(f"Invalid coordinates: start={start}, end={end}")
-
-    # Add tracks based on which list is provided
-    if loop_line_list:
-        for start, end in loop_line_list:
-            add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-    elif coil_line_list:
-        for line in coil_line_list:
-            if len(line) == 2:
-                start, end = line
-                add_track(board, start, end, coil.traceWidth, pcbnew.F_Cu, offset)
-
-    # Save the board to a temporary file in the Temp directory
-    temp_board_file = os.path.join(TEMP_DIR, "temp_coil.kicad_pcb")
-    pcbnew.SaveBoard(temp_board_file, board)
-
-    # Generate the drill files
-    excellon_writer = pcbnew.EXCELLON_WRITER(board)
-    excellon_writer.SetMapFileFormat(pcbnew.PLOT_FORMAT_PDF)
-    excellon_writer.SetOptions(False, False, pcbnew.VECTOR2I(0, 0), False)
-    excellon_writer.SetFormat(True)
-
-    # Generate unique filenames for coil and loop drill files
-    coil_filename = f"COIL_{coil.generateCoilFilename()}"
-    loop_filename = f"LOOP_{coil.generateCoilFilename()}"
-
-    # Generate drill files
-    if coil_line_list:
-        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{coil_filename}-PTH.drl"))
-        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{coil_filename}-NPTH.drl"))
-
-    if loop_line_list:
-        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{loop_filename}-PTH.drl"))
-        excellon_writer.CreateDrillFile(os.path.join(global_output_directory, f"{loop_filename}-NPTH.drl"))
-
-    print(f"Drill files generated in {global_output_directory}")
-
-def initialize_drill_generation(coil, coil_line_list, loop_line_list):
-    generate_drill(coil, coil_line_list, loop_line_list, offset=(0, 0))
 
 def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.9):
     loop_trace_width = 0.6096  # mm
@@ -501,6 +637,7 @@ def generate_loop_antenna_with_pads(coil, offset=(0, 0)):
         'loop_diameter': loop_diameter,
         'pad_gap': pad_gap
     }
+print ("generate_loop_antenna_with_pads")
 
 def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
     loop_data = generate_loop_antenna_with_pads(coil, offset)
@@ -555,4 +692,4 @@ def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
         track.SetWidth(int(loop_data['loop_trace_width'] * 1e6))
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
-
+print ("add_loop_antenna_with_pads")
