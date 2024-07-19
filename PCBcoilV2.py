@@ -335,6 +335,68 @@ class coilClass:
         return self.calcInductanceSingleLayer() if (self.layers == 1) else calcInductanceMultilayer(self.turns, self.diam, self.clearance, self.traceWidth, self.layers, self.calcLayerSpacing(), self.shape, self.formula)
 
 
+    def calcResonantFrequency(self, capacitance):
+        """
+        Calculate the resonant frequency of the coil using the actual trace length.
+        
+        Parameters:
+        self.traceWidth: The trace width in mm.
+        self.calcCoilTraceLength(): The trace length in mm.
+        
+        Returns:
+        float: The resonant frequency in MHz.
+        """
+        traceWidth = self.traceWidth
+        trace_length = self.calcCoilTraceLength()
+
+        actual_trace_length = traceWidth + trace_length
+
+        # Linear model parameters
+        slope = -0.9962700648151179283473766190581955015659332275390625
+        intercept = 11.897391483473739981491235084831714630126953125
+
+        # Calculate resonant frequency
+        log_frequency = slope * np.log(actual_trace_length) + intercept
+        resonant_frequency = np.exp(log_frequency)
+        
+        print(f"Estimated Resonant Frequency: {resonant_frequency:.2f} MHz")
+        return resonant_frequency
+
+
+# Add this method to the coilClass in PCBcoilV2.py
+
+    def calculate_diameter_for_frequency(self, target_frequency):
+        """
+        Calculate the diameter needed to achieve the target resonant frequency.
+        
+        Parameters:
+        target_frequency: The desired resonant frequency in MHz.
+        
+        Returns:
+        float: The suggested diameter in mm.
+        """
+        current_diameter = self.diam
+        current_frequency = self.calcResonantFrequency(1e-9)  # Using a dummy capacitance
+        
+        # Use binary search to find the correct diameter
+        min_diameter = 1.0  # Minimum possible diameter in mm
+        max_diameter = 1000.0  # Maximum possible diameter in mm
+        
+        while abs(current_frequency - target_frequency) > 0.01:  # 0.01 MHz tolerance
+            if current_frequency < target_frequency:
+                max_diameter = current_diameter
+            else:
+                min_diameter = current_diameter
+            
+            current_diameter = (min_diameter + max_diameter) / 2
+            self.diam = current_diameter
+            current_frequency = self.calcResonantFrequency(1e-9)
+            
+            if max_diameter - min_diameter < 0.01:  # Prevent infinite loop
+                break
+        
+        return round(current_diameter, 2)
+
 
 
 

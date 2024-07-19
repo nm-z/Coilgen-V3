@@ -33,6 +33,7 @@ class CoilParameterGUI:
         self.create_parameters_section()
         self.create_export_section()
         self.create_update_button()
+        self.create_resonant_frequency_display()
 
     def create_parameters_section(self):
         # Parameters Section
@@ -104,6 +105,15 @@ class CoilParameterGUI:
         ttk.Button(button_frame, text="Update", command=self.submit, width=20).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Export", command=self.export, width=20).pack(side=tk.RIGHT, padx=5)
 
+    def create_resonant_frequency_display(self):
+        # Create a frame for the resonant frequency display
+        self.freq_frame = ttk.Frame(self.main_frame)
+        self.freq_frame.grid(row=29, columnspan=4, pady=10)
+
+        # The label for the resonant frequency
+        self.freq_label = ttk.Label(self.freq_frame, text="EstimatedResonant Frequency: N/A", font=('TkDefaultFont', 12))
+        self.freq_label.pack()
+
     def submit(self):
         try:
             self.params = {
@@ -121,6 +131,12 @@ class CoilParameterGUI:
                 "square_calc": self.square_calc_var.get()
             }
             coil = self.update_callback(self.params)
+            
+            # Calculate and display the resonant frequency
+            capacitance = 1e-9  # This value is not used in the current equation, but kept for future modifications
+            resonant_freq = coil.calcResonantFrequency(capacitance)
+            self.freq_label.config(text=f"Estimated Resonant Frequency: {resonant_freq:.2f} MHz")
+            
             return coil
         except ValueError as e:
             messagebox.showerror("Error", f"Invalid input: {e}")

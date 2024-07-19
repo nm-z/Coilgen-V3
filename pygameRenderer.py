@@ -237,41 +237,34 @@ class pygameDrawer():
         self.debugText: dict[str,list[str]] = None # a list of some text to display
         self.debugTextKey: str = 'few' # when no key is selected, default to empty string
         from __main__ import coilClass, mmCopperToOz # bad
-        self.makeDebugText: Callable[['coilClass'], dict[str,list[str]]] = lambda coil:{     'few' : [
-                                                                                    "diam [mm]: "+str(round(coil.diam, 1)),
-                                                                                    "shape: "+coil.shape.__class__.__name__,
-                                                                                    "turns: "+str(coil.turns),
-                                                                                    "traceWidth [mm]: "+str(round(coil.traceWidth, 2)),
-                                                                                    "clearance [mm]: "+str(round(coil.clearance, 2)),
-                                                                                    "um copper: "+str(round(coil.copperThickness * 1000, 1)),
-                                                                                    "layers: "+str(coil.layers),
-                                                                                    (("PCBthickness [mm]: "+str(round(coil.PCBthickness, 2))) if (coil.layers>1) else ""),
-                                                                                    "resistance [mOhm]: "+str(round(coil.calcTotalResistance() * 1000, 2)),
-                                                                                    "inductance [uH]: "+str(round(coil.calcInductance() * 1000000, 2)) ],
-                                                                                        'all' : [
-                                                                                    "diam [mm]: "+str(round(coil.diam, 2)),
-                                                                                    "trueDiam [mm]: "+str(round(coil.calcTrueDiam(), 2)),
-                                                                                    "simpleInnerDiam [mm]: "+str(round(coil.calcSimpleInnerDiam(), 2)),
-                                                                                    "trueInnerDiam [mm]: "+str(round(coil.calcTrueInnerDiam(), 2)),
-                                                                                    "trueDiamOffset [mm]: "+str(round(coil._calcTrueDiamOffset(), 2)),
-                                                                                    "shape: "+coil.shape.__class__.__name__,
-                                                                                    "formula: "+coil.formula,
-                                                                                    "turns: "+str(coil.turns),
-                                                                                    "traceWidth [mm]: "+str(round(coil.traceWidth, 2)),
-                                                                                    "clearance [mm]: "+str(round(coil.clearance, 2)),
-                                                                                    "um copper: "+str(round(coil.copperThickness * 1000, 1)),
-                                                                                    "oz copper: "+str(round(mmCopperToOz(coil.copperThickness), 1)),
-                                                                                    "layers: "+str(coil.layers),
-                                                                                    (("PCBthickness [mm]: "+str(round(coil.PCBthickness, 2))) if (coil.layers>1) else ""),
-                                                                                    (("layer spacing [mm]: "+str(round(coil.calcLayerSpacing(), 2))) if (coil.layers>1) else ""),
-                                                                                    "lenght (uncoiled) [mm]: "+str(round(coil.calcCoilTraceLength(), 2)),
-                                                                                    "return trace length [mm]: "+str(round(coil.calcReturnTraceLength(), 2)),
-                                                                                    "resistance [mOhm]: "+str(round(coil.calcTotalResistance() * 1000, 2)),
-                                                                                    "inductance [uH]: "+str(round(coil.calcInductance() * 1000000, 3)),
-                                                                                    (("inductance 1-layer [uH]: "+str(round(coil.calcInductanceSingleLayer() * 1000000, 3))) if (coil.layers>1) else ""),
-                                                                                    "induct/resist [uH/Ohm]: "+str(round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 2)),
-                                                                                    "induct/radius [uH/mm]: "+str(round(coil.calcInductance() * 1000000 / (coil.diam/2), 2)),
-                                                                                    "induct/turns [uH/mm]: "+str(round(coil.calcInductance() * 1000000 / coil.turns, 2)) ] }
+        self.makeDebugText: Callable[['coilClass'], dict[str,list[str]]] = lambda coil: {
+            'few': [
+                "diam (Point to point)[mm]: " + str(round(coil.diam, 1)),
+                "shape: " + coil.shape.__class__.__name__,
+                "turns: " + str(coil.turns),
+                "traceWidth [mm]: " + str(round(coil.traceWidth, 2)),
+                "clearance [mm]: " + str(round(coil.clearance, 2)),
+                "um copper: " + str(round(coil.copperThickness * 1000, 1)),
+                "layers: " + str(coil.layers),
+                (("PCBthickness [mm]: " + str(round(coil.PCBthickness, 2))) if (coil.layers > 1) else ""),
+                "resistance [mOhm]: " + str(round(coil.calcTotalResistance() * 1000, 2)),
+                "inductance [uH]: " + str(round(coil.calcInductance() * 1000000, 2)),
+                "trueDiam [mm]: " + str(round(coil.calcTrueDiam(), 2)),
+                "simpleInnerDiam [mm]: " + str(round(coil.calcSimpleInnerDiam(), 2)),
+                "trueInnerDiam [mm]: " + str(round(coil.calcTrueInnerDiam(), 2)),
+                "trueDiamOffset [mm]: " + str(round(coil._calcTrueDiamOffset(), 2)),
+                "formula: " + coil.formula,
+                "oz copper: " + str(round(mmCopperToOz(coil.copperThickness), 1)),
+                (("layer spacing [mm]: " + str(round(coil.calcLayerSpacing(), 2))) if (coil.layers > 1) else ""),
+                "length (uncoiled) [mm]: " + str(round(coil.calcCoilTraceLength(), 2)),
+                "return trace length [mm]: " + str(round(coil.calcReturnTraceLength(), 2)),
+                "inductance [uH]: " + str(round(coil.calcInductance() * 1000000, 3)),
+                (("inductance 1-layer [uH]: " + str(round(coil.calcInductanceSingleLayer() * 1000000, 3))) if (coil.layers > 1) else ""),
+                "induct/resist [uH/Ohm]: " + str(round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 2)),
+                "induct/radius [uH/mm]: " + str(round(coil.calcInductance() * 1000000 / (coil.diam / 2), 2)),
+                "induct/turns [uH/mm]: " + str(round(coil.calcInductance() * 1000000 / coil.turns, 2))
+            ]
+        }
         
     def _updateViewOffset(self, mousePos: tuple[int,int]=None): #screen dragging
         """(UI element) if active (button press), 'drag' the screen around by using the mouse"""
