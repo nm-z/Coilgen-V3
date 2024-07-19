@@ -34,6 +34,7 @@ class CoilParameterGUI:
         self.create_export_section()
         self.create_update_button()
         self.create_resonant_frequency_display()
+        self.create_resonant_frequency_input()
 
     def create_parameters_section(self):
         # Parameters Section
@@ -114,6 +115,47 @@ class CoilParameterGUI:
         self.freq_label = ttk.Label(self.freq_frame, text="EstimatedResonant Frequency: N/A", font=('TkDefaultFont', 12))
         self.freq_label.pack()
 
+    def create_resonant_frequency_input(self):
+        # Create a frame for the resonant frequency input
+        self.freq_input_frame = ttk.Frame(self.main_frame)
+        self.freq_input_frame.grid(row=28, columnspan=4, pady=10)
+
+        # Label for the input
+        ttk.Label(self.freq_input_frame, text="Desired Resonant Frequency (MHz):").pack(side=tk.LEFT)
+
+        # Entry for the desired frequency
+        self.desired_freq_var = tk.StringVar()
+        self.desired_freq_entry = tk.Entry(self.freq_input_frame, textvariable=self.desired_freq_var, width=10)
+        self.desired_freq_entry.pack(side=tk.LEFT, padx=5)
+
+        # Button to calculate diameter
+        ttk.Button(self.freq_input_frame, text="Calculate Diameter", command=self.calculate_diameter).pack(side=tk.LEFT, padx=5)
+
+    def calculate_diameter(self):
+        try:
+            desired_freq = float(self.desired_freq_var.get())
+            coil = self.submit()
+            if coil:
+                suggested_diameter, actual_frequency = coil.calculate_diameter_for_frequency(desired_freq)
+                self.diameter_entry.delete(0, tk.END)
+                self.diameter_entry.insert(0, str(suggested_diameter))
+                
+                message = (f"Suggested diameter: {suggested_diameter:.2f} mm\n"
+                        f"Resulting frequency: {actual_frequency:.6f} MHz\n"
+                        f"Desired frequency: {desired_freq:.6f} MHz\n"
+                        f"Difference: {abs(actual_frequency - desired_freq):.6f} MHz")
+                
+                messagebox.showinfo("Suggested Diameter", message)
+                
+                # Update the coil with the new diameter and recalculate
+                self.diameter_entry.delete(0, tk.END)
+                self.diameter_entry.insert(0, str(suggested_diameter))
+                self.submit()
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid input: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+
     def submit(self):
         try:
             self.params = {
@@ -133,16 +175,16 @@ class CoilParameterGUI:
             coil = self.update_callback(self.params)
             
             # Calculate and display the resonant frequency
-            capacitance = 1e-9  # This value is not used in the current equation, but kept for future modifications
-            resonant_freq = coil.calcResonantFrequency(capacitance)
-            self.freq_label.config(text=f"Estimated Resonant Frequency: {resonant_freq:.2f} MHz")
+            resonant_freq = coil.calcResonantFrequency(1e-9)  # Using a dummy capacitance
+            self.freq_label.config(text=f"Estimated Resonant Frequency: {resonant_freq:.6f} MHz")
             
             return coil
         except ValueError as e:
             messagebox.showerror("Error", f"Invalid input: {e}")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
-
+        return None
+    
     def export(self):
         coil = self.submit()
         if coil:

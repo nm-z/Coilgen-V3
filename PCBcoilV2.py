@@ -373,30 +373,48 @@ class coilClass:
         target_frequency: The desired resonant frequency in MHz.
         
         Returns:
-        float: The suggested diameter in mm.
+        tuple: (suggested diameter in mm, actual achieved frequency in MHz)
         """
-        current_diameter = self.diam
-        current_frequency = self.calcResonantFrequency(1e-9)  # Using a dummy capacitance
-        
-        # Use binary search to find the correct diameter
-        min_diameter = 1.0  # Minimum possible diameter in mm
-        max_diameter = 1000.0  # Maximum possible diameter in mm
-        
-        while abs(current_frequency - target_frequency) > 0.01:  # 0.01 MHz tolerance
-            if current_frequency < target_frequency:
-                max_diameter = current_diameter
-            else:
-                min_diameter = current_diameter
-            
-            current_diameter = (min_diameter + max_diameter) / 2
-            self.diam = current_diameter
-            current_frequency = self.calcResonantFrequency(1e-9)
-            
-            if max_diameter - min_diameter < 0.01:  # Prevent infinite loop
-                break
-        
-        return round(current_diameter, 2)
+        # Linear model parameters
+        slope = -0.9962700648151179283473766190581955015659332275390625
+        intercept = 11.897391483473739981491235084831714630126953125
 
+        # Reverse the equation to get the required trace length
+        log_frequency = np.log(target_frequency)
+        required_trace_length = np.exp((log_frequency - intercept) / slope)
+
+        # Calculate the required diameter
+        # We need to solve: required_trace_length = traceWidth + self.calcCoilTraceLength()
+        # Since calcCoilTraceLength is complex, we'll use an iterative approach
+
+        tolerance = 1e-6  # Tighter tolerance for more accuracy
+
+        original_diameter = self.diam + self.traceWidth  # Store original actual diameter
+
+        # Start with the original actual diameter as an initial guess
+        current_diameter = original_diameter
+        step_size = current_diameter / 2  # Initial step size
+
+        max_iterations = 10000  # Increase max iterations for more accuracy
+        for _ in range(max_iterations):
+            self.diam = current_diameter - self.traceWidth  # Adjust diam for internal calculations
+            actual_trace_length = self.traceWidth + self.calcCoilTraceLength()
+            
+            if abs(actual_trace_length - required_trace_length) < tolerance:
+                break  # We've found a sufficiently close match
+            elif actual_trace_length < required_trace_length:
+                current_diameter += step_size
+            else:
+                current_diameter -= step_size
+            
+            step_size /= 2  # Reduce step size for finer adjustments
+
+        suggested_diameter = current_diameter  # Don't round here for maximum accuracy
+        actual_frequency = self.calcResonantFrequency(1e-9)  # Calculate the actual frequency achieved
+
+        self.diam = original_diameter - self.traceWidth  # Restore original diameter
+
+        return suggested_diameter, actual_frequency
 
 
 
@@ -660,8 +678,7 @@ def update_coil_params(params):
     loop_diameter = float(params.get("loop_diameter", 0))
     loop_shape = params.get("loop_shape", "circle")
 
-
-    if  loop_shape in ['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer']:
+    if loop_shape in ['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer']:
         coil_loop_shape = 'circle'  # Use circle as a default for the coil
     else:
         coil_loop_shape = loop_shape
@@ -680,6 +697,9 @@ def update_coil_params(params):
         coil = coilClass(
             turns, diam, clearance, traceWidth, layers, PCBthickness, copperThickness, shape, formula, False, loop_enabled, loop_diameter, coil_loop_shape
         )
+
+    # Add this line to set the x_center and y_center attributes
+    coil.x_center, coil.y_center = 0, 0
 
     renderedLineLists = [coil.renderAsCoordinateList()]
     if coil.loop_enabled:
