@@ -29,7 +29,7 @@ exe = EXE(
     a.binaries + kicad_files,
     a.datas,
     [],
-    name='PCBcoilV2',
+    name='Coilgen_V3.6_3',  
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

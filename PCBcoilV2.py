@@ -10,6 +10,10 @@ import math  # Import the math module to use its functions
 from typing import Callable
 from numpy import linspace, pi, cos, sin, arctan2  # Import additional functions for rounded corners
 from prettytable import PrettyTable
+from colorama import init, Fore, Style
+
+# Initialize colorama
+init(autoreset=True)
 
 # trace too extended
 
@@ -233,7 +237,7 @@ def calcLayerSpacing(layers: int, PCBthickness: float, copperThickness: float) -
 
 def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWidth: float, shape: _shapeBaseClass, formula: str) -> float:
     if (formula not in shape.formulaCoefficients):
-        print("could not calcInductanceSingleLayer(), for shape=", shape, " and formula=", formula)
+        print(Fore.RED + Style.BRIGHT + f"could not calcInductanceSingleLayer(), for shape={shape} and formula={formula}" + Style.RESET_ALL)
         return (-1.0)
     trueInnerDiamM = calcTrueInnerDiam(turns, diam, clearance, traceWidth, shape) * distUnitMult
     trueDiamM = calcTrueDiam(diam, clearance, traceWidth, shape) * distUnitMult
@@ -248,13 +252,13 @@ def calcInductanceSingleLayer(turns: int, diam: float, clearance: float, traceWi
     elif (formula == 'cur_sheet'):
         return ((coeff[0] * magneticConstant * (turns**2) * averageDiamM * (np.log(coeff[1] / fillFactor) + (coeff[2] * fillFactor) + (coeff[3] * (fillFactor**2)))) / 2)
     else:
-        print("impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!")
+        print(Fore.RED + Style.BRIGHT + "impossible point reached in calcInductanceSingleLayer(), check the formulaCoefficients formula names in this function!" + Style.RESET_ALL)
         return (-1.0)
 
 def calcInductanceMultilayer(turns: int, diam: float, clearance: float, traceWidth: float, layers: int, layerSpacing: float, shape: _shapeBaseClass, formula: str) -> float:
     singleInduct = calcInductanceSingleLayer(turns, diam, clearance, traceWidth, shape, formula)
     if (singleInduct < 0):
-        print("can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0:", singleInduct)
+        print(Fore.RED + Style.BRIGHT + f"can't calcInductanceMultilayer(), calcInductanceSingleLayer() returned <0: {singleInduct}" + Style.RESET_ALL)
         return (-1.0)
     couplingConstant_D = (1.025485443, -0.201166582)
     sumOfSpacings = layerSpacing * ((layers * (layers + 1) * (layers - 1)) / 6)
@@ -289,6 +293,7 @@ class coilClass:
         if shape in shapes:
             self.shape = shapes[shape]
         else:
+            print(Fore.RED + Style.BRIGHT + f"Shape {shape} is not recognized. Available shapes are: {list(shapes.keys())}" + Style.RESET_ALL)
             raise ValueError(f"Shape {shape} is not recognized. Available shapes are: {list(shapes.keys())}")
         self.formula = formula
         self.CCW = CCW
@@ -297,6 +302,7 @@ class coilClass:
         if loop_shape in shapes:
             self.loop_shape = loop_shape  # Store the key
         else:
+            print(Fore.RED + Style.BRIGHT + f"Loop shape {loop_shape} is not recognized. Available shapes are: {list(shapes.keys())}" + Style.RESET_ALL)
             raise ValueError(f"Loop shape {loop_shape} is not recognized. Available shapes are: {list(shapes.keys())}")
         self.calcPos = calcPos if calcPos else self.shape.calcPos
         self.calcLength = calcLength if calcLength else self.shape.calcLength
@@ -359,7 +365,6 @@ class coilClass:
         log_frequency = slope * np.log(actual_trace_length) + intercept
         resonant_frequency = np.exp(log_frequency)
         
-        print(f"Estimated Resonant Frequency: {resonant_frequency:.2f} MHz")
         return resonant_frequency
 
 
@@ -422,12 +427,12 @@ class coilClass:
         coordinates = []
         if self.shape.isDiscrete:
             if angleResOverride is not None:
-                print("renderAsCoordinateList() ignoring angleResOverride, shape not circular")
+                print(Fore.YELLOW + Style.BRIGHT + "renderAsCoordinateList() ignoring angleResOverride, shape not circular" + Style.RESET_ALL)
             
             # Square coil specific logic
             n_turns = int(self.turns)
             if abs(n_turns - self.turns) > 0.01:
-                print(f'[WARNING] square coil can only have integer number of turns; reducing n_turns to {n_turns}')
+                print(Fore.YELLOW + Style.BRIGHT + f'[WARNING] square coil can only have integer number of turns; reducing n_turns to {n_turns}' + Style.RESET_ALL)
 
             if self.calcPos == self.shape.calcPos:
                 points = []
@@ -462,7 +467,7 @@ class coilClass:
                     line_segments.append((points[i], points[i + 1]))
 
                 # Print trace lengths for square coil
-                print("Trace Lengths for Square Coil:")
+                print(Style.BRIGHT + Fore.LIGHTBLUE_EX + "Trace Lengths for Square Coil:" + Style.RESET_ALL)
                 for i, segment in enumerate(line_segments):
                     length = math.sqrt((segment[1][0] - segment[0][0])**2 + (segment[1][1] - segment[0][1])**2)
                     print(f"Trace {i+1} Length: {length:.2f} mm")
@@ -471,13 +476,13 @@ class coilClass:
             else:
                 coordinates = [self.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
                 if len(coordinates) % 10 == 0:  # Example condition: print only if the number of coordinates is a multiple of 10
-                    print(f"renderAsCoordinateList (Discrete): {len(coordinates)} points")
+                    print(Fore.CYAN + Style.BRIGHT + f"renderAsCoordinateList (Discrete): {len(coordinates)} points" + Style.RESET_ALL)
 
         else:
             angleRes = angleResOverride if angleResOverride else angleRenderResDefault
             coordinates = [self.shape.calcPos(i * angleRes, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(round((self.shape.stepsPerTurn * self.turns) / angleRes, 0)) + 1)]
             if len(coordinates) % 10 == 0:  # Same example condition
-                print(f"renderAsCoordinateList (Continuous): {len(coordinates)} points")
+                print(Fore.CYAN + Style.BRIGHT + f"renderAsCoordinateList (Continuous): {len(coordinates)} points" + Style.RESET_ALL)
 
         # Convert list of points to list of line segments
         line_segments = []
@@ -545,12 +550,11 @@ class coilClass:
 
             loop_diameter = self.diam
 
-            print(f"Calculated Loop Diameter: {loop_diameter}")  # Debugging statement
+            print(Fore.GREEN + Style.BRIGHT + f"Calculated Loop Diameter: {loop_diameter}" + Style.RESET_ALL)  # Debugging statement
 
 
             # Calculate half the side of the square loop + the scale
             half_side = (loop_diameter / 2) * center_offset
-
 
             loop_lines = [
                 ((self.x_center - half_side, self.y_center - half_side),
@@ -563,7 +567,7 @@ class coilClass:
                 (self.x_center - half_side, self.y_center - half_side))
             ]
 
-            print(f"Loop Coordinates: {loop_lines}")  # Debugging statement
+            print(Fore.BLUE + Style.BRIGHT + f"Loop Coordinates: {loop_lines}" + Style.RESET_ALL)  # Debugging statement
 
 
             # Define pad sizes based on coil diameter
@@ -634,7 +638,7 @@ class coilClass:
             points = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
             return points
         else:
-            print(f"Unsupported loop shape: {self.loop_shape}")
+            print(Fore.RED + Style.BRIGHT + f"Unsupported loop shape: {self.loop_shape}" + Style.RESET_ALL)
             return []
     
 
@@ -655,14 +659,14 @@ def print_trace_lengths(coil, line_segments, already_printed):
             table.add_row([f"Trace {i+1}", f"{segment_length:.2f}"])
         
         table.add_row(["Total", f"{total_length:.2f}"])
-        print(table)
+        print(Fore.WHITE + Style.BRIGHT + str(table) + Style.RESET_ALL)
         return True  # Set already_printed to True after printing
     return False
 
 
 def update_coil_params(params):
     global coil, renderedLineLists, drawer, updated
-    print("Updating coil parameters...")  # Debugging statement to confirm function call
+    print(Fore.CYAN + Style.BRIGHT + "Updating coil parameters..." + Style.RESET_ALL)  # Debugging statement to confirm function call
 
     turns = int(params["Turns"])
     diam = float(params["Diameter"])
@@ -705,7 +709,7 @@ def update_coil_params(params):
     if coil.loop_enabled:
         loop_antenna_coords = coil.render_loop_antenna()
         if not loop_antenna_coords:
-            print("Warning: Loop antenna coordinates are empty")
+            print(Fore.YELLOW + Style.BRIGHT + "Warning: Loop antenna coordinates are empty" + Style.RESET_ALL)
         renderedLineLists.append(loop_antenna_coords)
     else:
         renderedLineLists.append([])
@@ -715,7 +719,10 @@ def update_coil_params(params):
     drawer.debugText = drawer.makeDebugText(coil)
     drawer.lastFilename = coil.generateCoilFilename()
     updated = True  # Set the update flag to true after updating the coil parameters    
-    print("Update complete.")  # Debugging statement to confirm update completion
+    print(Fore.GREEN + Style.BRIGHT + "Update complete." + Style.RESET_ALL) 
+    resonant_frequency = coil.calcResonantFrequency(1e-9)  # Calculate resonant frequency
+    print(Fore.MAGENTA + Style.BRIGHT + f"Estimated Resonant Frequency: {resonant_frequency:.2f} MHz" + Style.RESET_ALL)
+ # Debugging statement to confirm update completion
     return coil  # Ensure the coil object is returned
     
 # Am I synced git with VS ???
@@ -770,7 +777,7 @@ def main():
                     try:
                         formattedLine.append(flatten_and_convert_to_floats(point))
                     except ValueError as e:
-                        print(e)
+                        print(Fore.RED + Style.BRIGHT + str(e) + Style.RESET_ALL)
                 formattedLineLists.append(tuple(formattedLine))
 
             drawer.drawLineList(formattedLineLists)  # Always draw the coil
@@ -790,11 +797,11 @@ def main():
 
     else:
         update_coil_params(initial_params)
-        print("coil details:")
-        print(f"resistance [mOhm]: {round(coil.calcTotalResistance() * 1000, 3)}")
-        print(f"inductance [uH]: {round(coil.calcInductance() * 1000000, 3)}")
-        print(f"induct/resist [uH/Ohm]: {round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 3)}")
-        print(f"induct/radius [uH/mm]: {round(coil.calcInductance() * 1000000 / (coil.diam / 2), 3)}")
+        print(Fore.WHITE + "coil details:")
+        print(Fore.CYAN + f"resistance [mOhm]: {round(coil.calcTotalResistance() * 1000, 3)}")
+        print(Fore.CYAN + f"inductance [uH]: {round(coil.calcInductance() * 1000000, 3)}")
+        print(Fore.CYAN + f"induct/resist [uH/Ohm]: {round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 3)}")
+        print(Fore.CYAN + f"induct/radius [uH/mm]: {round(coil.calcInductance() * 1000000 / (coil.diam / 2), 3)}")
 
 if __name__ == "__main__":
     main()
