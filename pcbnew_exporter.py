@@ -1,21 +1,8 @@
-import sys
 import os
-import logging
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-# Adjust the path for packaged environment
-if getattr(sys, 'frozen', False):
-    kicad_bin_path = os.path.join(sys._MEIPASS, 'KiCad/bin')
-else:
-    kicad_bin_path = '/usr/bin'  # Default KiCad binary path on Linux
-
-sys.path.append('/usr/lib/python3.12/site-packages')
-sys.path.append('/usr/share/kicad/scripting')
 import pcbnew
 import tkinter as tk
 from tkinter import filedialog
 from PCBcoilV2 import coilClass
-import math
 
 # Get the path to the Temp directory within the project folder
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'Temp')
@@ -702,3 +689,13 @@ def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 print ("add_loop_antenna_with_pads")
+
+
+# If module not found, add to sys.path
+# import sys
+# print("Imported modules:")
+# for name, module in sys.modules.items():
+#     if module:
+#         print(f"{name}: {getattr(module, '__file__', 'built-in')}")
+
+

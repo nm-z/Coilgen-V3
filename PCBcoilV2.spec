@@ -1,51 +1,45 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import sys
 
 a = Analysis(
     ['PCBcoilV2.py'],
     pathex=[],
-    binaries=[
-        ('C:\\Users\\natez\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140.dll', '.'),
-        ('C:\\Users\\natez\\AppData\\Local\\Programs\\Python\\Python311\\VCRUNTIME140_1.dll', '.')
-    ],  # Add any specific binaries needed by pcbnew_exporter.py here
-    datas=[
-        ('C:\\Users\\natez\\PCBcoilGenerator\\pcbnew\\bin', 'bin')
-    ],  # Removed the trailing comma and ensured the bracket is closed
-    hiddenimports=[
-        'pcbnew'  # Ensure pcbnew is included if not detected, add any hidden imports used dynamically in pcbnew_exporter.py
-    ],
+    binaries=[],
+    datas=[],
+    hiddenimports=['pcbnew'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
 )
 pyz = PYZ(a.pure)
+
+# Add KiCad-specific files
+kicad_files = [
+    ('_pcbnew.so', '/usr/lib/python3.12/site-packages/_pcbnew.so', 'BINARY'),
+    ('pcbnew.py', '/usr/lib/python3.12/site-packages/pcbnew.py', 'DATA'),
+]
 
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries + kicad_files,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='PCBcoilV2',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='PCBcoilV2',
 )
