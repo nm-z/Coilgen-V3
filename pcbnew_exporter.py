@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 from PCBcoilV2 import coilClass
 from colorama import init, Fore, Style
+import logging
 
 # Initialize colorama
 init(autoreset=True)
@@ -36,19 +37,20 @@ def export_coil(coil, coil_line_list, export_options):
                 elif option == 'DXF':
                     generate_dxf(coil, coil_line_list, [], combined=False)
 
-def export_loop(coil, coil_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+def export_loop(coil, coil_line_list, export_options, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
+    logging.debug(f"Exporter - export_loop called with loop_diameter_mode: {loop_diameter_mode}, custom_loop_diameter: {custom_loop_diameter}")
     output_dir = set_output_directory()
     if output_dir:
         for option, var in export_options.items():
             if var.get():
                 if option == 'SVG':
-                    generate_svg(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+                    generate_svg(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
                 elif option == 'Gerber':
-                    generate_gerber(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+                    generate_gerber(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
                 elif option == 'DXF':
-                    generate_dxf(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+                    generate_dxf(coil, coil_line_list, [], loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
 
-def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
@@ -138,7 +140,10 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        if loop_diameter_mode == "Custom" and custom_loop_diameter is not None:
+            add_loop_antenna_with_pads_2_layer(board, coil, offset, custom_diameter=custom_loop_diameter)
+        else:
+            add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
         # Add coil to board
@@ -185,10 +190,11 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
 
     print(Fore.GREEN + f"SVG file(s) generated in {global_output_directory}")
 
-def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
-    generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+def initialize_svg_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
+    generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
 
-def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
+    logging.debug(f"Exporter - generate_gerber called with loop_diameter_mode: {loop_diameter_mode}, custom_loop_diameter: {custom_loop_diameter}")
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(0, 0)):
@@ -203,9 +209,6 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
             board.Add(track)
         else:
             print(Fore.RED + f"Invalid coordinates: start={start}, end={end}")
-
-
-
 
     if combined:
         # Add coil to board
@@ -269,9 +272,6 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
 
         filename = f"COMBINED_{coil.generateCoilFilename()}"
 
-
-
-
     elif loop_with_pads:
         for line in loop_line_list:
             if len(line) == 2:
@@ -284,7 +284,12 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        if loop_diameter_mode == "Custom" and custom_loop_diameter is not None:
+            logging.debug(f"Exporter - Calling add_loop_antenna_with_pads_2_layer with custom_diameter: {custom_loop_diameter}")
+            add_loop_antenna_with_pads_2_layer(board, coil, offset, custom_diameter=custom_loop_diameter)
+        else:
+            logging.debug("Exporter - Calling add_loop_antenna_with_pads_2_layer with default parameters")
+            add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
         # Add coil to board
@@ -330,16 +335,16 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
     plot_controller.ClosePlot()
     print(Fore.GREEN + f"Gerber file(s) generated in {global_output_directory}")
 
-def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+def initialize_gerber_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
     # Set different offsets based on the loop type
     if loop_with_pads_2_layer:
         offset = (0, 0)  # Specific offset for Loop with Pads 2 Layer
     else:
         offset = (0, 0)  # Default offset for other types
 
-    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined)
+    generate_gerber(coil, coil_line_list, loop_line_list, offset=offset, loop_with_pads=loop_with_pads, loop_with_pads_2_layer=loop_with_pads_2_layer, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
 
-def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False):
+def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=False, loop_with_pads_2_layer=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
     board = pcbnew.BOARD()
 
     def add_track(board, start, end, traceWidth, layer, offset=(150, 100)):
@@ -429,7 +434,10 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
             if len(line) == 2:
                 start, end = line
                 add_track(board, start, end, coil.traceWidth, pcbnew.B_Cu, offset)
-        add_loop_antenna_with_pads_2_layer(board, coil, offset)
+        if loop_diameter_mode == "Custom" and custom_loop_diameter is not None:
+            add_loop_antenna_with_pads_2_layer(board, coil, offset, custom_diameter=custom_loop_diameter)
+        else:
+            add_loop_antenna_with_pads_2_layer(board, coil, offset)
         filename = f"LOOP_2LAYER_{coil.generateCoilFilename()}"
     else:
         # Add coil to board
@@ -478,22 +486,27 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
 
     print(Fore.GREEN + f"DXF file(s) generated in {global_output_directory}")
 
-def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, combined=False):
-    generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, combined=combined)
+def initialize_dxf_generation(coil, coil_line_list, loop_line_list, loop_with_pads=False, combined=False, loop_diameter_mode="Auto", custom_loop_diameter=None):
+    generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_pads=loop_with_pads, combined=combined, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
 
-
-
-def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.8000):
+def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.8000, custom_diameter=None):
+    logging.debug(f"Exporter - generate_loop_antenna_with_pads_2_layer called with custom_diameter: {custom_diameter}")
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
     coil_trace_width = float(coil.traceWidth)    
-    scale_factor=0.8000
 
     # Use a local variable for the specialized coil diameter
     actual_coil_diam = coil_diameter + coil_trace_width 
 
-    # Adjusted calculation to make actual_loop_diam equal to 80% of coil_diam_adjusted
-    loop_diameter = (actual_coil_diam * scale_factor) - loop_trace_width
+    if custom_diameter is not None:
+        # Use the custom diameter if provided
+        loop_diameter = custom_diameter - loop_trace_width
+        print(Fore.GREEN + "Using user-defined custom diameter for loop.")
+        print(Fore.RED + f"Custom Diameter: {custom_diameter} mm")
+    else:
+        # Adjusted calculation to make actual_loop_diam equal to 80% of coil_diam_adjusted
+        loop_diameter = (actual_coil_diam * scale_factor) - loop_trace_width
+        print(Fore.GREEN + "Using auto-scaled diameter for loop.")
 
     # Calculate pad dimensions based on the scaled loop diameter
     if loop_diameter <= 12:
@@ -535,8 +548,8 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
         'pad_gap': pad_gap
     }
 
-def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=0.8000):
-    loop_data = generate_loop_antenna_with_pads_2_layer(coil, offset, scale_factor)
+def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=0.8000, custom_diameter=None):
+    loop_data = generate_loop_antenna_with_pads_2_layer(coil, offset, scale_factor, custom_diameter)
     
     # Use loop points directly without additional scaling
     loop_points = loop_data['loop']
@@ -589,8 +602,6 @@ def generate_loop_antenna_with_pads(coil, offset=(0, 0)):
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
     coil_trace_width = float(coil.traceWidth)
-
-
 
     loop_diameter = (3 * coil_trace_width) + coil_diameter + loop_trace_width
     print(Fore.BLUE + f"coil_trace_width: {coil_trace_width} mm")
