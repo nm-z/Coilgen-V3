@@ -748,7 +748,7 @@ def main():
     root.after(0, root.deiconify)
     
     initial_params = {
-        "Turns": 4, "Diameter": 10, "Width between traces": 0.5, "Trace Width": 0.5, 
+        "Turns": 10, "Diameter": 20, "Width between traces": 0.5, "Trace Width": 0.5, 
         "Layers": 1, "PCB Thickness": 0.6, "Copper Thickness": 0.030, 
         "Shape": 'square', "Formula": 'cur_sheet', "loop_enabled": False, "loop_diameter": 0.0, "loop_shape": 'circle',
         "square_calc": 'Planar inductor'
