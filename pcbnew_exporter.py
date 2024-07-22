@@ -502,7 +502,7 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
         # Use the custom diameter if provided
         loop_diameter = custom_diameter - loop_trace_width
         print(Fore.GREEN + "Using user-defined custom diameter for loop.")
-        print(Fore.RED + f"Custom Diameter: {custom_diameter} mm")
+        print(Fore.BLUE + Style.BRIGHT + f"Custom Diameter: {custom_diameter} mm" + Style.RESET_ALL)
     else:
         # Adjusted calculation to make actual_loop_diam equal to 80% of coil_diam_adjusted
         loop_diameter = (actual_coil_diam * scale_factor) - loop_trace_width

@@ -725,8 +725,6 @@ def update_coil_params(params):
  # Debugging statement to confirm update completion
     return coil  # Ensure the coil object is returned
     
-# Am I synced git with VS ???
-
 # Helper function to flatten nested tuples
 def flatten_and_convert_to_floats(point):
     if isinstance(point, (list, tuple)) and len(point) == 2:
@@ -742,6 +740,8 @@ def flatten_and_convert_to_floats(point):
 def main():
     from tkinter_coil_gui import CoilParameterGUI
     global coil, renderedLineLists, drawer
+
+    print(Fore.GREEN + Style.BRIGHT + "Starting PCBcoilV2..." + Style.RESET_ALL)  # Add this line to confirm the script is running
 
     root = tk.Tk()
     app = CoilParameterGUI(root, update_coil_params)
@@ -765,36 +765,40 @@ def main():
 
         listUpdated = True  # Flag to track if the list has been updated
 
-        while windowHandler.keepRunning:
-            loopStart = time.time()
-            drawer.renderBG()
+        try:
+            while windowHandler.keepRunning:
+                loopStart = time.time()
+                drawer.renderBG()
 
-            # Ensure the elements in renderedLineLists are tuples of tuples containing floats
-            formattedLineLists = []
-            for line in renderedLineLists:
-                formattedLine = []
-                for point in line:
-                    try:
-                        formattedLine.append(flatten_and_convert_to_floats(point))
-                    except ValueError as e:
-                        print(Fore.RED + Style.BRIGHT + str(e) + Style.RESET_ALL)
-                formattedLineLists.append(tuple(formattedLine))
+                # Ensure the elements in renderedLineLists are tuples of tuples containing floats
+                formattedLineLists = []
+                for line in renderedLineLists:
+                    formattedLine = []
+                    for point in line:
+                        try:
+                            formattedLine.append(flatten_and_convert_to_floats(point))
+                        except ValueError as e:
+                            print(Fore.RED + Style.BRIGHT + str(e) + Style.RESET_ALL)
+                    formattedLineLists.append(tuple(formattedLine))
 
-            drawer.drawLineList(formattedLineLists)  # Always draw the coil
-            drawer.renderFG()
-            windowHandler.frameRefresh()
-            UI.handleAllWindowEvents(drawer)
+                drawer.drawLineList(formattedLineLists)  # Always draw the coil
+                drawer.renderFG()
+                windowHandler.frameRefresh()
+                UI.handleAllWindowEvents(drawer)
 
-            if drawer.localVarUpdated:
-                drawer.localVarUpdated = False
-                listUpdated = True  # Set the flag when localVar is updated
+                if drawer.localVarUpdated:
+                    drawer.localVarUpdated = False
+                    listUpdated = True  # Set the flag when localVar is updated
 
-            loopEnd = time.time()
-            sleep_time = max(0, (1 / 60) - (loopEnd - loopStart))
-            time.sleep(sleep_time)
+                loopEnd = time.time()
+                sleep_time = max(0, (1 / 60) - (loopEnd - loopStart))
+                time.sleep(sleep_time)
 
-            root.update()
-
+                root.update()
+        except Exception as e:
+            print(f"An error occurred: {e}")  # Print any exceptions that occur
+        finally:
+            print(Fore.GREEN + "Exiting PCBcoilV2..." + Style.RESET_ALL)  # Add this line to confirm the script is ending
     else:
         update_coil_params(initial_params)
         print(Fore.WHITE + "coil details:")
@@ -802,6 +806,7 @@ def main():
         print(Fore.CYAN + f"inductance [uH]: {round(coil.calcInductance() * 1000000, 3)}")
         print(Fore.CYAN + f"induct/resist [uH/Ohm]: {round(coil.calcInductance() * 1000000 / coil.calcTotalResistance(), 3)}")
         print(Fore.CYAN + f"induct/radius [uH/mm]: {round(coil.calcInductance() * 1000000 / (coil.diam / 2), 3)}")
+
 
 if __name__ == "__main__":
     main()
