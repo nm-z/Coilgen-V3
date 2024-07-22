@@ -489,15 +489,11 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
     coil_trace_width = float(coil.traceWidth)    
     scale_factor=0.8000
 
+    # Use a local variable for the specialized coil diameter
     actual_coil_diam = coil_diameter + coil_trace_width 
-
-#     loop_diameter = actual_coil_diam * scale_factor
 
     # Adjusted calculation to make actual_loop_diam equal to 80% of coil_diam_adjusted
     loop_diameter = (actual_coil_diam * scale_factor) - loop_trace_width
-
-
-
 
     # Calculate pad dimensions based on the scaled loop diameter
     if loop_diameter <= 12:
@@ -527,10 +523,6 @@ def generate_loop_antenna_with_pads_2_layer(coil, offset=(0, 0), scale_factor=0.
     pad_right_center = (pad_right_x + offset[0], pad_y + offset[1])
 
     print(Fore.BLUE + f"Loop Diameter-2 Layer: {loop_diameter} mm")
-
-
-
-
 
     return {
         'loop': loop_coords,
@@ -593,10 +585,18 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=
         board.Add(track)
 
 def generate_loop_antenna_with_pads(coil, offset=(0, 0)):
+    print(Fore.BLUE + "generate_loop_antenna_with_pads...")
     loop_trace_width = 0.6096  # mm
     coil_diameter = float(coil.diam)
     coil_trace_width = float(coil.traceWidth)
-    loop_diameter = coil_diameter + 2 * (coil_trace_width + loop_trace_width)
+
+
+
+    loop_diameter = (3 * coil_trace_width) + coil_diameter + loop_trace_width
+    print(Fore.BLUE + f"coil_trace_width: {coil_trace_width} mm")
+    print(Fore.BLUE + f"coil_diameter: {coil_diameter} mm")
+    print(Fore.BLUE + f"loop_diameter: {loop_diameter} mm")
+
     
     # Calculate pad dimensions
     if coil_diameter <= 12:
@@ -625,7 +625,6 @@ def generate_loop_antenna_with_pads(coil, offset=(0, 0)):
     pad_left_center = (pad_left_x + offset[0], pad_y + offset[1])
     pad_right_center = (pad_right_x + offset[0], pad_y + offset[1])
     
-    print(Fore.BLUE + f"Loop diameter: {loop_diameter} mm")
     
     return {
         'loop': loop_coords,
@@ -641,7 +640,7 @@ print(Fore.BLUE + "Generated Loop Antenna With Pads")
 
 def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
     loop_data = generate_loop_antenna_with_pads(coil, offset)
-    
+    print(Fore.BLUE + "add_loop_antenna_with_pads...")
     # Add C-shaped loop (top, left, right)
     loop_points = [
         (loop_data['loop'][0][0], loop_data['loop'][0][1]),  # Top-left
