@@ -15,13 +15,13 @@ class CoilParameterGUI:
         self.shapes = ['square', 'hexagon', 'octagon', 'circle']
         self.formulas = ['cur_sheet', 'monomial', 'wheeler']
         self.defaults = {
-            "Turns": 10,
-            "Diameter": 20,
-            "Width between traces": 0.5,
-            "Trace Width": 0.5,
+            "Turns": 20,
+            "Diameter": 120,
+            "Width between traces": 0.61,
+            "Trace Width": 0.61,
             "Layers": 1,
-            "PCB Thickness": 0.5,
-            "Copper Thickness": 0.05
+            "PCB Thickness": 0.6,
+            "Copper Thickness": 0.035
         }
 
         # Initialize the variables for comboboxes
@@ -45,7 +45,6 @@ class CoilParameterGUI:
 
         # Loop Parameters in a new row
         self.create_loop_widgets()
-
 
     def create_coil_widgets(self):
         ttk.Label(self.main_frame, text="Coil", font=('TkDefaultFont', 12, 'bold')).grid(row=1, columnspan=2, sticky='w')
