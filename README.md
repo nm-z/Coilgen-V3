@@ -19,15 +19,18 @@
 Coilgen V3 is a powerful tool for designing and generating coil patterns. This version includes several improvements and new features over previous versions.
 
 ## 2. Installation
+
 ### Windows Installation
-1. Download the installation package from the official website.
-2. Run the installer and follow the prompts to complete the installation.
-3. Once installed, launch Coilgen V3 from the Start menu.
+1. Go to the official Coilgen V3 releases page on GitHub.
+2. Download the latest Windows executable (.exe) file.
+3. Once downloaded, double-click the .exe file to run Coilgen V3 directly. No additional installation is required.
 
 ### Linux Installation
-1. Download the installation package from the official website.
-2. Extract the contents of the package to a directory of your choice.
-3. Navigate to the extracted directory and run the coilgen executable to launch the application.
+1. Visit the official Coilgen V3 releases page on GitHub.
+2. Download the latest Linux executable file.
+3. Once downloaded, double-click the executable file to run Coilgen V3 directly. No additional installation is required.
+
+Note: For both Windows and Linux, you can create a shortcut or alias to the executable for easy access.
 
 ## 3. Getting Started
 To get started with Coilgen V3, follow these steps:
@@ -47,12 +50,53 @@ Coilgen V3 includes the following features:
 - Configuration saving
 
 ## 5. User Interface
-The Coilgen V3 UI consists of the following elements:
-- Menu bar: Provides access to various menus and options.
-- Toolbar: Offers quick access to frequently used tools and features.
-- Design area: Displays the coil pattern and allows for interactive design and customization.
-- Parameter panel: Allows for adjustment of coil design parameters.
-- Status bar: Displays information about the current design and application status.
+
+The Coilgen V3 user interface is designed to be intuitive and user-friendly. Here's an overview of the main components:
+
+[Insert image of the Coilgen V3 interface here]
+
+### Coil Parameters
+
+The main window allows you to set various parameters for your coil design:
+
+- **Turns**: Number of turns in the coil
+- **Diameter**: Diameter of the coil (mm)
+- **Width between traces**: Spacing between coil traces (mm)
+- **Trace Width**: Width of the coil trace (mm)
+- **Layers**: Number of layers in the coil
+- **PCB Thickness**: Thickness of the PCB (mm)
+- **Copper Thickness**: Thickness of the copper layer (mm)
+- **Shape**: Choose from square, hexagon, octagon, or circle
+- **Formula**: Select the formula for calculations (cur_sheet, monomial, or wheeler)
+
+### Loop Antenna Options
+
+- **Loop Antenna Layer**: Choose between "Loop Antenna with Pads" or "Loop Antenna with Pads 2 Layer"
+- **Loop Diameter**: Option to set as "Auto" or "Custom"
+  - When "Custom" is selected, you can input a specific diameter for the loop antenna
+
+### Export Options
+
+You can choose which files to export:
+- SVG
+- Gerber
+- DXF
+
+Additionally, you can select whether to export the coil, the loop, or both.
+
+### Resonant Frequency Estimation
+
+The interface includes a section for resonant frequency estimation:
+- Display of the estimated resonant frequency based on current parameters
+- Input field for desired resonant frequency
+- Button to calculate the diameter needed for a specific frequency
+
+### Update and Export Buttons
+
+- **Update**: Recalculates the coil parameters based on your inputs
+- **Export**: Generates the selected file formats with the current coil design
+
+This interface provides a comprehensive set of tools for designing and exporting your coil patterns, with real-time updates and estimations to aid in the design process.
 
 ## 6. Usage Guide
 To use Coilgen V3, follow these steps:
@@ -137,32 +181,3 @@ The following table shows example data for the resonant frequency estimation fea
 | 33.528            | 4473.9          |
 | 96012.00          | 1.6             |
 | 29763.72          | 5.0             |
-
-## 13. Square Coil Geometry
-
-The square coil geometry in Coilgen V3 is designed based on principles outlined in the paper "Inductance calculation and layout optimization for planar spiral inductors". This design ensures optimal performance and efficiency for the generated coil patterns.
-
-### Key Geometric Principles
-
-1. **Coil Shape**: The square shape is chosen for its balance between inductance density and ease of fabrication. Square coils offer higher inductance per unit area compared to circular coils, while still maintaining relatively simple manufacturing processes.
-
-2. **Turn Spacing**: The spacing between turns is optimized to balance between maximizing mutual inductance (which increases with tighter spacing) and minimizing parasitic capacitance (which decreases with wider spacing).
-
-3. **Conductor Width**: The width of the conductor is carefully calculated to minimize resistance while considering skin effect at the intended operating frequency.
-
-4. **Number of Turns**: The number of turns is determined based on the desired inductance value and the available area, taking into account that inductance increases approximately with the square of the number of turns.
-
-5. **Inner Diameter**: The inner diameter is optimized to maximize the Q-factor of the inductor. A larger inner diameter reduces the negative impact of the innermost turns on the overall inductance.
-
-6. **Outer Diameter**: The outer diameter is constrained by the available area and the desired inductance value. It's optimized to achieve the target inductance while maintaining a compact design.
-
-### Optimization Process
-
-Coilgen V3 uses an iterative optimization process to determine the best geometric parameters for the square coil. This process involves:
-
-1. Initial parameter estimation based on the target inductance and available area.
-2. Calculation of inductance using accurate models that account for mutual inductance between turns.
-3. Adjustment of parameters to minimize resistance and maximize Q-factor.
-4. Verification that the design meets all specified constraints.
-
-This optimization ensures that the generated square coil designs provide high performance and efficiency for the intended application.
