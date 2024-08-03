@@ -53,7 +53,7 @@ Coilgen V3 includes the following features:
 
 The Coilgen V3 user interface is designed to be intuitive and user-friendly. Here's an overview of the main components:
 
-[Insert image of the Coilgen V3 interface here]
+![image](https://github.com/user-attachments/assets/1d8bbf4d-86a5-4e66-b63c-118846bcee9b)
 
 ### Coil Parameters
 
@@ -148,17 +148,22 @@ Gerber file(s) generated in /home/nate/Desktop/Coilgen_Exports
 ```
 
 ## 12. Resonant Frequency Estimation
-Coilgen V3 includes a feature for estimating the resonant frequency of the designed coil pattern. This feature uses a linear model to estimate the frequency based on the coil design parameters.
 
-### Linear Model
-The linear model used for resonant frequency estimation is as follows:
+Coilgen V3 includes a feature for estimating the resonant frequency of the designed coil pattern. This feature uses a linear regression model based on actual measurement data to estimate the frequency based on the coil design parameters.
+
+### Linear Regression Model
+
+The linear regression model used for resonant frequency estimation was derived from real-world measurements of various coil designs. The model is as follows:
 
 f = −0.9962700648151179 × L + 11.897391483473740
 
-where f is the estimated resonant frequency and L is the coil design parameter.
+where f is the estimated resonant frequency and L is the coil design parameter (typically related to the trace length).
+
+This empirical model provides a good approximation of the resonant frequency for a wide range of coil designs within the scope of Coilgen V3's capabilities.
 
 ### Example Data
-The following table shows example data for the resonant frequency estimation feature:
+
+The following table shows some of the measurement data used to develop the linear regression model:
 
 | Trace Length (µm) | Frequency (MHz) |
 |-------------------|-----------------|
@@ -167,17 +172,11 @@ The following table shows example data for the resonant frequency estimation fea
 | 61132.97          | 2.5             |
 | 3355.24           | 44.7            |
 | 845.31            | 177.4           |
-| 3355.240          | 44.7            |
-| 845.312           | 177.4           |
 | 214.376           | 699.7           |
 | 55.118            | 2721.4          |
-| 2565.401          | 58.5            |
-| 647.700           | 231.6           |
-| 178.308           | 841.2           |
 | 39.624            | 3785.6          |
-| 2176.272          | 68.9            |
-| 550.469           | 272.5           |
-| 154.229           | 972.6           |
 | 33.528            | 4473.9          |
 | 96012.00          | 1.6             |
 | 29763.72          | 5.0             |
+
+This data represents a range of coil designs and their corresponding measured resonant frequencies, which formed the basis for the linear regression model used in Coilgen V3.
