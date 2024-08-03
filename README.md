@@ -1,19 +1,19 @@
 # Coilgen V3 Documentation
 
 ## Table of Contents
-1. Introduction
-2. Installation
-3. Getting Started
-4. Features
-5. User Interface
-6. Usage Guide
-7. Configuration
-8. Export Options
-9. Troubleshooting
-10. FAQ
-11. Changelog
-12. Resonant Frequency Estimation
-13. Square Coil Geometry
+1. [Introduction](#1-introduction)
+2. [Installation](#2-installation)
+3. [Getting Started](#3-getting-started)
+4. [Features](#4-features)
+5. [User Interface](#5-user-interface)
+6. [Usage Guide](#6-usage-guide)
+7. [Configuration](#7-configuration)
+8. [Export Options](#8-export-options)
+9. [Troubleshooting](#9-troubleshooting)
+10. [FAQ](#10-faq)
+11. [Changelog](#11-changelog)
+12. [Resonant Frequency Estimation](#12-resonant-frequency-estimation)
+13. [Square Coil Geometry](#13-square-coil-geometry)
 
 ## 1. Introduction
 Coilgen V3 is a powerful tool for designing and generating coil patterns. This version includes several improvements and new features over previous versions.
