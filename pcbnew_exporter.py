@@ -16,6 +16,19 @@ if not os.path.exists(TEMP_DIR):
 
 global_output_directory = None
 
+def copper_layer_set(layer):
+    """Create a copper layer set through KiCad's supported layer API."""
+    layers = pcbnew.LSET()
+    layers.AddLayer(layer)
+    return layers
+
+def set_filled_plot_mode(plot_options):
+    """Keep filled plots across KiCad's old and current plot-parameter APIs."""
+    setter = getattr(plot_options, "SetPlotMode", None)
+    if setter is None:
+        setter = plot_options.SetDXFPlotMode
+    setter(pcbnew.FILLED)
+
 def set_output_directory():
     global global_output_directory
     if global_output_directory is None:
@@ -109,7 +122,7 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
             pad.SetShape(pcbnew.PAD_SHAPE_RECT)
             pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
             pad.SetPosition(pad_position)
-            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            pad.SetLayerSet(copper_layer_set(pcbnew.F_Cu))
             dummy_module.Add(pad)
 
             # Add trace connecting loop corner to pad
@@ -164,8 +177,7 @@ def generate_svg(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(False)
     plot_options.SetScale(1)
-    plot_options.SetPlotMode(pcbnew.FILLED)
-    plot_options.SetPlotViaOnMaskLayer(False)
+    set_filled_plot_mode(plot_options)
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
@@ -253,7 +265,7 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
             pad.SetShape(pcbnew.PAD_SHAPE_RECT)
             pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
             pad.SetPosition(pad_position)
-            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            pad.SetLayerSet(copper_layer_set(pcbnew.F_Cu))
             dummy_module.Add(pad)
 
             # Add trace connecting loop corner to pad
@@ -310,8 +322,7 @@ def generate_gerber(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_wi
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(True)
     plot_options.SetScale(1)
-    plot_options.SetPlotMode(pcbnew.FILLED)
-    plot_options.SetPlotViaOnMaskLayer(False)
+    set_filled_plot_mode(plot_options)
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
 
@@ -403,7 +414,7 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
             pad.SetShape(pcbnew.PAD_SHAPE_RECT)
             pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
             pad.SetPosition(pad_position)
-            pad.SetLayerSet(pcbnew.LSET(pcbnew.F_Cu))
+            pad.SetLayerSet(copper_layer_set(pcbnew.F_Cu))
             dummy_module.Add(pad)
 
             # Add trace connecting loop corner to pad
@@ -452,14 +463,16 @@ def generate_dxf(coil, coil_line_list, loop_line_list, offset=(0, 0), loop_with_
 
     plot_controller = pcbnew.PLOT_CONTROLLER(board)
     plot_options = plot_controller.GetPlotOptions()
-    plot_options.SetDXFPlotUnits(pcbnew.DXF_UNITS_MILLIMETERS)
+    units = getattr(pcbnew, "DXF_UNITS_MM", None)
+    if units is None:
+        units = pcbnew.DXF_UNITS_MILLIMETERS
+    plot_options.SetDXFPlotUnits(units)
     plot_options.SetPlotFrameRef(False)
     plot_options.SetAutoScale(False)
     plot_options.SetMirror(False)
     plot_options.SetUseGerberAttributes(False)
     plot_options.SetScale(1)
-    plot_options.SetPlotMode(pcbnew.FILLED)
-    plot_options.SetPlotViaOnMaskLayer(False)
+    set_filled_plot_mode(plot_options)
     plot_options.SetSkipPlotNPTH_Pads(False)
     plot_options.SetSubtractMaskFromSilk(False)
     plot_options.SetOutputDirectory(global_output_directory)
@@ -580,7 +593,7 @@ def add_loop_antenna_with_pads_2_layer(board, coil, offset=(0, 0), scale_factor=
         pad.SetShape(pcbnew.PAD_SHAPE_RECT)
         pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
         pad.SetPosition(pad_position)
-        pad.SetLayerSet(pcbnew.LSET(pcbnew.B_Cu))
+        pad.SetLayerSet(copper_layer_set(pcbnew.B_Cu))
         dummy_module.Add(pad)
         
         # Add trace connecting loop corner to pad
@@ -686,7 +699,7 @@ def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
         pad.SetShape(pcbnew.PAD_SHAPE_RECT)
         pad_position = pcbnew.VECTOR2I(int(pad_x * 1e6), int(pad_y * 1e6))
         pad.SetPosition(pad_position)
-        pad.SetLayerSet(pcbnew.LSET(pcbnew.B_Cu))
+        pad.SetLayerSet(copper_layer_set(pcbnew.B_Cu))
         dummy_module.Add(pad)
         
         # Add trace connecting loop corner to pad
@@ -703,5 +716,3 @@ def add_loop_antenna_with_pads(board, coil, offset=(0, 0)):
         track.SetLayer(pcbnew.B_Cu)
         board.Add(track)
 print(Fore.BLUE + "Added 'Loop Antenna With Pads' to the board")
-
-
