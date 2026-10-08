@@ -434,7 +434,7 @@ class coilClass:
             if abs(n_turns - self.turns) > 0.01:
                 print(Fore.YELLOW + Style.BRIGHT + f'[WARNING] square coil can only have integer number of turns; reducing n_turns to {n_turns}' + Style.RESET_ALL)
 
-            if self.calcPos == self.shape.calcPos:
+            if isinstance(self.shape, squareSpiral) and self.calcPos == self.shape.calcPos:
                 points = []
                 r_outer = self.diam / 2
                 r_inner = self.calcSimpleInnerDiam() / 2
@@ -474,7 +474,7 @@ class coilClass:
 
                 return line_segments
             else:
-                coordinates = [self.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(self.shape.stepsPerTurn * self.turns + 1)]
+                coordinates = [self.calcPos(i, self.diam, self.clearance, self.traceWidth, self.CCW ^ reverseDirection) for i in range(int(self.shape.stepsPerTurn * self.turns) + 1)]
                 if len(coordinates) % 10 == 0:  # Example condition: print only if the number of coordinates is a multiple of 10
                     print(Fore.CYAN + Style.BRIGHT + f"renderAsCoordinateList (Discrete): {len(coordinates)} points" + Style.RESET_ALL)
 
@@ -491,7 +491,39 @@ class coilClass:
 
         return line_segments
 
-# loop 
+    def circle_loop_geometry(self):
+        """Return an analytic circle with 10 mm of clearance from the coil trace."""
+        diameter = self.loop_diameter if self.loop_diameter > 0 else self.calcTrueDiam() * 0.8
+        radius = (diameter - self.traceWidth) / 2
+        if radius <= 0:
+            raise ValueError("Loop diameter must exceed its trace width.")
+        segments = self.renderAsCoordinateList()
+        if not segments:
+            raise ValueError("A coil trace is required to position the loop.")
+        points = [point for segment in segments for point in segment]
+        max_x = max(point[0] for point in points)
+        center_y = (min(point[1] for point in points) + max(point[1] for point in points)) / 2
+
+        def clearance_distance(center_x):
+            nearest = float("inf")
+            for (ax, ay), (bx, by) in segments:
+                dx, dy = bx - ax, by - ay
+                length_squared = dx * dx + dy * dy
+                t = 0 if length_squared == 0 else max(0, min(1, ((center_x - ax) * dx + (center_y - ay) * dy) / length_squared))
+                nearest = min(nearest, math.hypot(center_x - ax - t * dx, center_y - ay - t * dy))
+            return nearest
+
+        target = radius + self.traceWidth + 10.0
+        low, high = max_x, max_x + target + self.calcTrueDiam()
+        for _ in range(64):
+            middle = (low + high) / 2
+            if clearance_distance(middle) < target:
+                low = middle
+            else:
+                high = middle
+        return {"center": ((low + high) / 2, center_y), "radius": radius, "trace_width": self.traceWidth}
+
+# loop
     def render_loop_antenna(self):
         if self.loop_shape == 'Loop Antenna with Pads':
             loop_trace_width = 0.6096  # Fixed trace width for the loop in mm
@@ -599,13 +631,10 @@ class coilClass:
 
 
         elif self.loop_shape == 'circle':
-            # Existing code for rendering circular loop antenna
-            shape_instance = shapes[self.loop_shape]
-            true_outer_diam = self.calcTrueDiam()
-            x_offset = (true_outer_diam / 2) + 5 + (self.loop_diameter / 2)
-            y_offset = (true_outer_diam / 2) - 20
-            loop_radius = self.loop_diameter / 2
-            adjusted_radius = loop_radius - (self.traceWidth / 2)
+            geometry = self.circle_loop_geometry()
+            self.loop_preview_circle = geometry
+            x_offset, y_offset = geometry["center"]
+            adjusted_radius = geometry["radius"]
 
             points = []
             num_segments = 64  # Increase for smoother circles
@@ -770,18 +799,7 @@ def main():
                 loopStart = time.time()
                 drawer.renderBG()
 
-                # Ensure the elements in renderedLineLists are tuples of tuples containing floats
-                formattedLineLists = []
-                for line in renderedLineLists:
-                    formattedLine = []
-                    for point in line:
-                        try:
-                            formattedLine.append(flatten_and_convert_to_floats(point))
-                        except ValueError as e:
-                            print(Fore.RED + Style.BRIGHT + str(e) + Style.RESET_ALL)
-                    formattedLineLists.append(tuple(formattedLine))
-
-                drawer.drawLineList(formattedLineLists)  # Always draw the coil
+                drawer.drawLineList(renderedLineLists)
                 drawer.renderFG()
                 windowHandler.frameRefresh()
                 UI.handleAllWindowEvents(drawer)
