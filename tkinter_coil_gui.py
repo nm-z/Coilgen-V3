@@ -16,6 +16,14 @@ class CoilParameterGUI:
 
         self.main_frame = ttk.Frame(self.master)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.notebook = ttk.Notebook(self.main_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        self.coil_frame = ttk.Frame(self.notebook, padding=10)
+        self.loop_frame = ttk.Frame(self.notebook, padding=10)
+        self.export_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(self.coil_frame, text="Coil")
+        self.notebook.add(self.loop_frame, text="Loop")
+        self.notebook.add(self.export_frame, text="Export")
 
         self.shapes = ['square', 'hexagon', 'octagon', 'circle']
         self.formulas = ['cur_sheet', 'monomial', 'wheeler']
@@ -41,24 +49,20 @@ class CoilParameterGUI:
 
 
         self.create_parameters_section()
+        self.create_loop_widgets()
         self.create_export_section()
         self.create_update_button()
         self.create_resonant_frequency_display()
         self.create_resonant_frequency_input()
-        self.create_loop_widgets()
 
     def create_parameters_section(self):
         # Parameters Section
-        ttk.Label(self.main_frame, text="Parameters", font=('TkDefaultFont', 14, 'bold')).grid(row=0, columnspan=4, sticky='w')
+        ttk.Label(self.coil_frame, text="Parameters", font=('TkDefaultFont', 14, 'bold')).grid(row=0, columnspan=4, sticky='w')
 
         # Coil Parameters
         self.create_coil_widgets()
 
-        # Loop Parameters in a new row
-        self.create_loop_widgets()
-
     def create_coil_widgets(self):
-        ttk.Label(self.main_frame, text="Coil", font=('TkDefaultFont', 12, 'bold')).grid(row=1, columnspan=2, sticky='w')
         self.param_labels = [
             "Turns", "Diameter", "Width between traces", "Trace Width", "Layers",
             "PCB Thickness", "Copper Thickness", "Shape", "Formula"
@@ -66,43 +70,43 @@ class CoilParameterGUI:
         self.param_entries = []
 
         for idx, label in enumerate(self.param_labels):
-            tk.Label(self.main_frame, text=label).grid(row=idx+1, column=0, sticky='w')
+            tk.Label(self.coil_frame, text=label).grid(row=idx+1, column=0, sticky='w')
             if label in ["Shape", "Formula"]:
-                combobox = ttk.Combobox(self.main_frame, textvariable=getattr(self, f"{label.lower()}_var"), values=getattr(self, f"{label.lower()}s"), width=28, state='readonly')
+                combobox = ttk.Combobox(self.coil_frame, textvariable=getattr(self, f"{label.lower()}_var"), values=getattr(self, f"{label.lower()}s"), width=28, state='readonly')
                 combobox.grid(row=idx+1, column=1, sticky='ew')
                 self.param_entries.append(combobox)
             else:
-                entry = tk.Entry(self.main_frame, width=30)
+                entry = tk.Entry(self.coil_frame, width=30)
                 entry.grid(row=idx+1, column=1, sticky='ew')
                 entry.insert(0, str(self.defaults.get(label, '')))
                 self.param_entries.append(entry)
                 setattr(self, f"{label.lower().replace(' ', '_')}_entry", entry)
 
-        self.main_frame.columnconfigure(1, weight=1)
+        self.coil_frame.columnconfigure(1, weight=1)
 
     def create_loop_widgets(self):
-        ttk.Label(self.main_frame, text="Loop", font=('TkDefaultFont', 12, 'bold')).grid(row=12, columnspan=2, sticky='w')
+        ttk.Label(self.loop_frame, text="Loop", font=('TkDefaultFont', 12, 'bold')).grid(row=0, columnspan=2, sticky='w')
         
         # Loop Antenna Shape
-        self.loop_shape_label = tk.Label(self.main_frame, text="Loop Antenna Layer")
-        self.loop_shape_combobox = ttk.Combobox(self.main_frame, textvariable=self.loop_shape_var, values=['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer'], width=28, state='readonly')
-        self.loop_shape_label.grid(row=13, column=0, sticky='w')
-        self.loop_shape_combobox.grid(row=13, column=1, sticky='ew')
+        self.loop_shape_label = tk.Label(self.loop_frame, text="Loop Antenna Layer")
+        self.loop_shape_combobox = ttk.Combobox(self.loop_frame, textvariable=self.loop_shape_var, values=['Loop Antenna with Pads', 'Loop Antenna with Pads 2 Layer'], width=28, state='readonly')
+        self.loop_shape_label.grid(row=1, column=0, sticky='w')
+        self.loop_shape_combobox.grid(row=1, column=1, sticky='ew')
 
         # Loop Diameter options (directly under the Loop Antenna Shape)
-        ttk.Label(self.main_frame, text="Loop Diameter", font=('TkDefaultFont', 10, 'bold')).grid(row=14, column=0, columnspan=2, sticky='w', pady=(10, 0))
+        ttk.Label(self.loop_frame, text="Loop Diameter", font=('TkDefaultFont', 10, 'bold')).grid(row=2, column=0, columnspan=2, sticky='w', pady=(10, 0))
 
         # Radio buttons for Auto and Custom options
-        self.auto_radio = Radiobutton(self.main_frame, text="Auto", variable=self.loop_diameter_mode, value="Auto", command=self.toggle_custom_diameter)
-        self.auto_radio.grid(row=15, column=0, sticky='w')
-        self.custom_radio = Radiobutton(self.main_frame, text="Custom", variable=self.loop_diameter_mode, value="Custom", command=self.toggle_custom_diameter)
-        self.custom_radio.grid(row=15, column=1, sticky='w')
+        self.auto_radio = Radiobutton(self.loop_frame, text="Auto", variable=self.loop_diameter_mode, value="Auto", command=self.toggle_custom_diameter)
+        self.auto_radio.grid(row=3, column=0, sticky='w')
+        self.custom_radio = Radiobutton(self.loop_frame, text="Custom", variable=self.loop_diameter_mode, value="Custom", command=self.toggle_custom_diameter)
+        self.custom_radio.grid(row=3, column=1, sticky='w')
 
         # Custom diameter input
-        self.custom_diameter_label = ttk.Label(self.main_frame, text="Custom Diameter (mm):")
-        self.custom_diameter_label.grid(row=16, column=0, sticky='w')
-        self.custom_diameter_entry = ttk.Entry(self.main_frame, textvariable=self.custom_loop_diameter, width=10)
-        self.custom_diameter_entry.grid(row=16, column=1, sticky='w')
+        self.custom_diameter_label = ttk.Label(self.loop_frame, text="Custom Diameter (mm):")
+        self.custom_diameter_label.grid(row=4, column=0, sticky='w')
+        self.custom_diameter_entry = ttk.Entry(self.loop_frame, textvariable=self.custom_loop_diameter, width=10)
+        self.custom_diameter_entry.grid(row=4, column=1, sticky='w')
 
         # Initially enable the Loop Diameter options since 2-layer is default
         self.enable_loop_diameter_options()
@@ -110,7 +114,7 @@ class CoilParameterGUI:
         # Bind the combobox selection to a method that enables/disables the Loop Diameter options
         self.loop_shape_combobox.bind("<<ComboboxSelected>>", self.on_loop_shape_change)
 
-        self.main_frame.columnconfigure(1, weight=1)
+        self.loop_frame.columnconfigure(1, weight=1)
 
     def disable_loop_diameter_options(self):
         self.auto_radio.config(state='disabled')
@@ -136,35 +140,47 @@ class CoilParameterGUI:
 
     def create_export_section(self):
         # Export Section
-        ttk.Label(self.main_frame, text="Export", font=('TkDefaultFont', 14, 'bold')).grid(row=20, columnspan=4, sticky='w')
+        ttk.Label(self.export_frame, text="Export", font=('TkDefaultFont', 14, 'bold')).grid(row=0, columnspan=4, sticky='w')
 
         # Files Subsection
-        ttk.Label(self.main_frame, text="Files", font=('TkDefaultFont', 10, 'bold')).grid(row=21, column=0, columnspan=2, sticky='w')
+        ttk.Label(self.export_frame, text="Files", font=('TkDefaultFont', 10, 'bold')).grid(row=1, column=0, columnspan=2, sticky='w')
         self.export_options = {
             'SVG': tk.BooleanVar(value=False),
             'Gerber': tk.BooleanVar(value=True),
             'DXF': tk.BooleanVar(value=False)
         }
-        tk.Checkbutton(self.main_frame, text="SVG", variable=self.export_options['SVG']).grid(row=22, column=0, sticky='w')
-        tk.Checkbutton(self.main_frame, text="Gerber", variable=self.export_options['Gerber']).grid(row=23, column=0, sticky='w')
-        tk.Checkbutton(self.main_frame, text="DXF", variable=self.export_options['DXF']).grid(row=24, column=0, sticky='w')
+        tk.Checkbutton(self.export_frame, text="SVG", variable=self.export_options['SVG']).grid(row=2, column=0, sticky='w')
+        tk.Checkbutton(self.export_frame, text="Gerber", variable=self.export_options['Gerber']).grid(row=3, column=0, sticky='w')
+        tk.Checkbutton(self.export_frame, text="DXF", variable=self.export_options['DXF']).grid(row=4, column=0, sticky='w')
 
         # Type Subsection
-        ttk.Label(self.main_frame, text="Type", font=('TkDefaultFont', 10, 'bold')).grid(row=21, column=1, sticky='w')
+        ttk.Label(self.export_frame, text="Type", font=('TkDefaultFont', 10, 'bold')).grid(row=1, column=1, sticky='w')
         self.export_coil_var = tk.BooleanVar(value=True)
         self.export_loop_var = tk.BooleanVar(value=True)
-        tk.Checkbutton(self.main_frame, text="Export Coil", variable=self.export_coil_var).grid(row=22, column=1, padx=5, pady=5, sticky='w')
-        tk.Checkbutton(self.main_frame, text="Export Loop", variable=self.export_loop_var).grid(row=23, column=1, padx=5, pady=5, sticky='w')
+        tk.Checkbutton(self.export_frame, text="Export Coil", variable=self.export_coil_var).grid(row=2, column=1, padx=5, pady=5, sticky='w')
+        tk.Checkbutton(self.export_frame, text="Export Loop", variable=self.export_loop_var).grid(row=3, column=1, padx=5, pady=5, sticky='w')
 
     def create_update_button(self):
         button_frame = ttk.Frame(self.main_frame)
-        button_frame.grid(row=30, columnspan=4, pady=10)
+        button_frame.pack(fill=tk.X, before=self.notebook, pady=(0, 10))
         ttk.Button(button_frame, text="Update", command=self.submit, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Export", command=self.export, width=20).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Export selected", command=self.export, width=20).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Export all", command=self.export_all, width=20).pack(side=tk.LEFT, padx=5)
+
+    def export_all(self):
+        """Export both components using the selected file formats."""
+        selected = (self.export_coil_var.get(), self.export_loop_var.get())
+        self.export_coil_var.set(True)
+        self.export_loop_var.set(True)
+        try:
+            self.export()
+        finally:
+            self.export_coil_var.set(selected[0])
+            self.export_loop_var.set(selected[1])
 
     def create_resonant_frequency_display(self):
         # Create a frame for the resonant frequency display
-        self.freq_frame = ttk.Frame(self.main_frame)
+        self.freq_frame = ttk.Frame(self.coil_frame)
         self.freq_frame.grid(row=29, columnspan=4, pady=10)
 
         # The label for the resonant frequency
@@ -173,7 +189,7 @@ class CoilParameterGUI:
 
     def create_resonant_frequency_input(self):
         # Create a frame for the resonant frequency input
-        self.freq_input_frame = ttk.Frame(self.main_frame)
+        self.freq_input_frame = ttk.Frame(self.coil_frame)
         self.freq_input_frame.grid(row=28, columnspan=4, pady=10)
 
         # Label for the input
@@ -244,6 +260,14 @@ class CoilParameterGUI:
         return None
     
     def export(self):
+        if not any(option.get() for option in self.export_options.values()):
+            messagebox.showerror("Export", "Select at least one file format in the Export tab.")
+            self.notebook.select(self.export_frame)
+            return
+        if not self.export_coil_var.get() and not self.export_loop_var.get():
+            messagebox.showerror("Export", "Select Coil, Loop, or both in the Export tab.")
+            self.notebook.select(self.export_frame)
+            return
         coil = self.submit()
         if coil:
             loop_shape = self.loop_shape_var.get()
@@ -261,33 +285,17 @@ class CoilParameterGUI:
             logging.debug(f"GUI - Custom loop diameter: {custom_loop_diameter}")
             
             try:
-                if loop_with_pads:
-                    if export_coil and not export_loop:
-                        # Only export coil
-                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
-                    elif not export_coil and export_loop:
-                        # Only export loop_with_pads
-                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads=True, combined=False)
-                    elif export_coil and export_loop:
-                        # Combined export (loop_with_pads and coil)
-                        pcbnew_exporter.export_loop(coil, coil.renderAsCoordinateList(), self.export_options, loop_with_pads=True, combined=True)
-                elif loop_with_pads_2_layer:
-                    if export_coil:
-                        # Only export coil
-                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
-                    if export_loop:
-                        # Only export loop_with_pads_2_layer
-                        logging.debug(f"GUI - Calling export_loop with custom_loop_diameter: {custom_loop_diameter}")
-                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads_2_layer=True, combined=False, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
-                    if export_coil and export_loop:
-                        # Export coil and loop_with_pads_2_layer separately
-                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
-                        logging.debug(f"GUI - Calling export_loop with custom_loop_diameter: {custom_loop_diameter}")
-                        pcbnew_exporter.export_loop(coil, [], self.export_options, loop_with_pads_2_layer=True, combined=False, loop_diameter_mode=loop_diameter_mode, custom_loop_diameter=custom_loop_diameter)
-                else:
-                    if export_coil:
-                        # Only export coil
-                        pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+                if export_coil:
+                    pcbnew_exporter.export_coil(coil, coil.renderAsCoordinateList(), self.export_options)
+                if export_loop:
+                    pcbnew_exporter.export_loop(
+                        coil, [], self.export_options,
+                        loop_with_pads=loop_with_pads,
+                        loop_with_pads_2_layer=loop_with_pads_2_layer,
+                        combined=False,
+                        loop_diameter_mode=loop_diameter_mode,
+                        custom_loop_diameter=custom_loop_diameter,
+                    )
             except Exception as e:
                 logging.error(f"GUI - Export error: {str(e)}")
                 messagebox.showerror("Export Error", f"An error occurred during export: {str(e)}")
