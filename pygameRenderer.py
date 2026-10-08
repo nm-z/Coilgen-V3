@@ -453,74 +453,53 @@ class pygameDrawer():
 
 
 
-    def drawLineList(self, lineLists: list[list[tuple[int,int]]]):
-        """draw a series of lines (used for rendering coils)"""
-        from __main__ import coilClass # bad code!
-        coilToDraw: 'coilClass' = self.localVar # if it crashes here, then it's probably time to fix this whole mess (rewrite the rendering class interaction with __main__)
-
-        # Validate and correct the structure of lineLists
-        if not all(isinstance(sublist, list) and all(isinstance(coord, tuple) and len(coord) == 2 for coord in sublist) for sublist in lineLists):
-            # Attempt to correct the structure or provide a fallback
-            try:
-                corrected_lineLists = [[(int(x), int(y)) for x, y in sublist] for sublist in lineLists]
-                lineLists = corrected_lineLists
-            except Exception as e:
-                print(f"Failed to correct lineLists structure: {e}")
-                return
-
-        if((len(lineLists) < 1) or (len(lineLists) < min(coilToDraw.layers, 2))):
-            print("can't drawLineList(), not enough lineLists provided")
+    def drawLineList(self, lineLists):
+        """Draw the segment endpoints supplied by the coil model without flattening."""
+        coilToDraw = self.localVar
+        if not lineLists or not lineLists[0]:
             return
+        coil_segments = lineLists[0]
+        lineWidthPixels = max(1, round(coilToDraw.traceWidth * self.sizeScale))
+        isCircular = not coilToDraw.shape.isDiscrete
 
-        if(len(lineLists[0]) < 2):
-            print("can't drawLineList(), lineLists[0] too short!")
-            return
+        if getattr(self, '_reverse_coil_source', None) is not coilToDraw:
+            self._reverse_coil_source = coilToDraw
+            self._reverse_coil_segments = coilToDraw.renderAsCoordinateList(reverseDirection=True)
 
-        # Check if lineLists[0] has the required structure
-        if not (isinstance(lineLists[0], list) and all(isinstance(j, tuple) and len(j) == 2 for j in lineLists[0])):
-            print("can't drawLineList(), lineLists[0] does not have the required structure!")
-            return
+        if coilToDraw.layers % 2:
+            last = coil_segments[-1][1]
+            first = coil_segments[0][0]
+            pygame.draw.line(self.windowHandler.window,
+                             self.layerColors[coilToDraw.layers % len(self.layerColors)],
+                             self.realToPixelPos((last[0], first[1])),
+                             self.realToPixelPos(last), lineWidthPixels)
 
-        isCircular = (True if isinstance(coilToDraw.shape.stepsPerTurn, float) else False) # only smooth corners for squares
-        lineWidthPixels = int(coilToDraw.traceWidth * self.sizeScale)
-        layerAdjust: Callable[[tuple[float,float],int], tuple[float,float]] = lambda pos, currentLayer : (pos[0] + coilToDraw.diam*currentLayer, pos[1]) # offset the positions of the different layers to make them visible
+        for currentLayer in reversed(range(coilToDraw.layers)):
+            color = self.layerColors[currentLayer % len(self.layerColors)]
+            segments = coil_segments if currentLayer % 2 == 0 else self._reverse_coil_segments
+            offset = coilToDraw.diam * currentLayer
+            for start, end in segments:
+                startPos = self.realToPixelPos((start[0] + offset, start[1]))
+                endPos = self.realToPixelPos((end[0] + offset, end[1]))
+                pygame.draw.line(self.windowHandler.window, color, startPos, endPos, lineWidthPixels)
+                if not isCircular:
+                    pygame.draw.circle(self.windowHandler.window, color,
+                                       tuple(round(v) for v in endPos), max(1, lineWidthPixels // 2))
 
-        if((coilToDraw.layers%2)!=0): # only in case of an un-even number of layers
-            pygame.draw.line(self.windowHandler.window, self.layerColors[coilToDraw.layers % len(self.layerColors)], self.realToPixelPos((lineLists[0][-1][0], lineLists[0][0][1])), self.realToPixelPos(lineLists[0][-1]), lineWidthPixels) # draw return trace first
-
-        for layerItt in range(coilToDraw.layers):
-            currentLayer = coilToDraw.layers-1-layerItt
-            currentLayerColor = self.layerColors[currentLayer % len(self.layerColors)] # draw layers back to front
-            lineList = lineLists[currentLayer % 2] # one list is CW and the other is CCW. (NOTE: this replaces the mirroring of layerAdjust in previous versions)
-            for i in range(len(lineList)-1):
-                startPos = self.realToPixelPos(layerAdjust(lineList[i], currentLayer))
-                endPos = self.realToPixelPos(layerAdjust(lineList[i+1], currentLayer))
-                pygame.draw.line(self.windowHandler.window, currentLayerColor, startPos, endPos, lineWidthPixels)
-                if(not isCircular):
-                    pygame.draw.ellipse(self.windowHandler.window, currentLayerColor, [ASA(-((lineWidthPixels-2)/2), endPos), [lineWidthPixels, lineWidthPixels]]) # draw a little circle in the corners for a smoother look
-
-
-
-
-
-
-        # Render loop antenna if enabled and available in lineLists
-        self.debugPrinted = False
-        if coilToDraw.loop_enabled and len(lineLists) > coilToDraw.layers:
-            loop_antenna_coords = lineLists[coilToDraw.layers]
-            loop_color = (255, 0, 0)  # Color for the loop antenna, e.g., red
-            debug = False  # Set to False to disable debugging outputs
-            if debug and len(loop_antenna_coords) > 0:
-                if not self.debugPrinted:
-                    print(f"Drawing loop antenna with {len(loop_antenna_coords)} points")
-                    self.debugPrinted = True  # Set the flag to True after printing
-                # Example of drawing the loop antenna
-                for i in range(len(loop_antenna_coords) - 1):
-                    startPos = self.realToPixelPos(loop_antenna_coords[i])
-                    endPos = self.realToPixelPos(loop_antenna_coords[i+1])
-                    pygame.draw.line(self.windowHandler.window, loop_color, startPos, endPos, lineWidthPixels)
-
-        # Clear the update flag after drawing
+        if coilToDraw.loop_enabled:
+            offset = coilToDraw.diam * (coilToDraw.layers - 1)
+            circle = getattr(coilToDraw, 'loop_preview_circle', None)
+            if coilToDraw.loop_shape == 'circle' and circle is not None:
+                center = self.realToPixelPos((circle['center'][0] + offset, circle['center'][1]))
+                radius = max(1, round(circle['radius'] * self.sizeScale))
+                width = max(1, round(circle['trace_width'] * self.sizeScale))
+                pygame.draw.circle(self.windowHandler.window, (255, 0, 0),
+                                   tuple(round(v) for v in center), radius, min(width, radius))
+            elif len(lineLists) > 1:
+                for start, end in lineLists[1]:
+                    pygame.draw.line(self.windowHandler.window, (255, 0, 0),
+                                     self.realToPixelPos((start[0] + offset, start[1])),
+                                     self.realToPixelPos((end[0] + offset, end[1])), lineWidthPixels)
         self.localVarUpdated = False
 
         diamDebugColor = [127,127,127]
